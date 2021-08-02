@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Alphabet is default sequence.
 const Alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 // New returns a Key object with the specified parameters,
