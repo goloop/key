@@ -5,13 +5,6 @@ import (
 	"unicode/utf8"
 )
 
-// // TestNewZeroLength tests New method with wrong size value.
-// func TestNewZeroLength(t *testing.T) {
-// 	if _, err := New(0); err == nil {
-// 		t.Error("key size must be greater than zero")
-// 	}
-// }
-
 // TestNewWithoutAlphabet tests New method without custom alphabet.
 func TestNewWithoutAlphabet(t *testing.T) {
 	key, err := New(3)
@@ -19,7 +12,8 @@ func TestNewWithoutAlphabet(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(key.Alphabet()) != utf8.RuneCountInString(Alphabet) {
+	defLen := utf8.RuneCountInString(defaultAlphabetCharacters)
+	if len(key.Alphabet()) != defLen {
 		t.Error("the default alphabet should be used")
 	}
 }
@@ -39,7 +33,7 @@ func TestMarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		key, err := New(uint(test.size), []rune(Alphabet)...)
+		key, err := New(uint(test.size), []rune(defaultAlphabetCharacters)...)
 		if err != nil {
 			t.Error(err)
 		}
@@ -70,7 +64,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		key, err := New(uint(test.size), []rune(Alphabet)...)
+		key, err := New(uint(test.size), []rune(defaultAlphabetCharacters)...)
 		if err != nil {
 			t.Error(err)
 		}

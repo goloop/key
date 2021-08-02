@@ -6,55 +6,83 @@ import (
 	"strings"
 )
 
-// Alphabet is default sequence.
-const Alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+// The defaultAlphabetCharacters the string of characters from which
+// the alphabet will be generated if the user doesn't set a custom one.
+const defaultAlphabetCharacters = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-// New returns a Key object with the specified parameters,
-// if an error occurs, the second value contains the error message.
+// New returns a pointer to the Key object as the first value.
+// The second value can contains an error if something went wrong.
+//
+// The function takes size of key as first argument. If any positive value
+// greater than zero is specified the key length will match this value.
+// Otherwise, if the size is set to zero - the key size will be dynamic, i.e.
+// the minimum key size will be one character and the maximum will depend on
+// the length of the alphabet and the possible maximum index of the iteration.
+//
+// Second, third, etc. is optional arguments of function.
+// These are the elements of the sequence for permutation (alphabet).
+// If the custom alphabet is missing, will be used an alphabet that
+// randomly generated from the characters a-z and 0-9.
+// The alphabet should not contain duplicate values.
 func New(size uint, alphabet ...rune) (*Key, error) {
 	var key *Key
 
-	// // The key cannot consist of an empty string only.
-	// if size < 1 {
-	// 	return key, errors.New("the key size cannot be less than one")
-	// }
-
-	// Set the default alphabet if the custom alphabet not set.
+	// Generate default alphabet if custom one is missing.
 	if len(alphabet) == 0 {
-		alphabet = shuffle([]rune(Alphabet))
+		// Use a standard sequence of characters to generate the alphabet.
+		// The alphabet should to be shuffled. Two different objects must
+		// have a different alphabet.
+		alphabet = shuffle([]rune(defaultAlphabetCharacters))
 	}
 
-	key = &Key{size: size, alphabet: alphabet, model: make(map[rune]int)}
+	// Create a pointer to the Key object.
+	key = &Key{size: size, alphabet: alphabet, indexOf: make(map[rune]int)}
+
+	// In the operation of the algorithm, it is necessary to determine the
+	// character in the sequence by the specified index (just slice[index]),
+	// and the character index in the sequence by the character
+	// (like the indexOf method).
+	//
+	// The classical indexOf method iterates over the characters in
+	// the sequence, which slows down the algorithm. Instead, we use
+	// map to store the matched character and index in the sequence.
+	// This requires quite a bit more memory to store a copy of the
+	// alphabet with the matches but increases the speed of the
+	// algorithm as a whole.
 	for i, char := range alphabet {
-		if _, ok := key.model[char]; ok {
+		// Check the presence of duplicates in the alphabet.
+		// The alphabet should not contain duplicates.
+		if _, ok := key.indexOf[char]; ok {
 			return key, fmt.Errorf("some elements of the alphabet "+
 				"are repeated: %c", char)
 		}
 
-		key.model[char] = i
+		key.indexOf[char] = i
 	}
 
 	return key, nil
 }
 
-// Key ...
+// Key is a key object.
 type Key struct {
-	// size is the size of the generated key
+	// size is the length of the generated key
 	size uint
 
-	// alphabet is a list of words to generate the key
+	// alphabet is a list of characters to generate the key
 	alphabet []rune
 
-	// model is a character identifiers in the alphabet
-	model map[rune]int
+	// indexOf it the map of matching alphabet characters as
+	// character and index (as well as an alphabet duplicate checker tool)
+	indexOf map[rune]int
 }
 
 // IsValid returns true if Key object is valid.
+// True only when the New method was executed without error.
 func (k *Key) IsValid() bool {
-	return len(k.alphabet) > 0
+	return len(k.alphabet) > 0 && len(k.alphabet) == len(k.indexOf)
 }
 
-// Alphabet returns current alphabet.
+// Alphabet returns current alphabet as rune slice.
 func (k *Key) Alphabet() []rune {
 	return k.alphabet
 }
@@ -64,12 +92,22 @@ func (k *Key) Size() uint {
 	return k.size
 }
 
-// LastID returns the last available ID in the sequence.
-func (k *Key) LastID() uint64 {
+// Total returns the highest possible iteration number.
+// For example, for "abc" alphabet and 3 key size can be created
+// the 27 iterations: aaa, aab, aac, ..., cca, ccb, ccc.
+// So indexs as 0 <= ID < Totla() can be used to generate a key.
+func (k *Key) Total() uint64 {
+	// If the size is set to zero - the key size is dynamic.
+	// Dynamic index iteration is limited to MaxUint64 size.
 	if k.size == 0 {
 		return math.MaxUint64
 	}
 
+	// The value of the last iteration index is calculated according to the
+	// formula A to the power of S, where A is the size of the alphabet,
+	// and S is the size of the key.
+	//
+	// But this value is limited to MaxUint64 size too.
 	tmp := math.Pow(float64(len(k.alphabet)), float64(k.size))
 	if tmp > math.MaxUint64 {
 		return math.MaxUint64
@@ -82,7 +120,7 @@ func (k *Key) LastID() uint64 {
 func (k *Key) Marshal(id uint64) (string, error) {
 	var result string
 
-	if id > k.LastID() {
+	if id > k.Total() {
 		return "", fmt.Errorf("large ID for key generation: %d", id)
 	}
 
@@ -119,7 +157,7 @@ func (k *Key) Unmarshal(key string) (uint64, error) {
 
 	id, value := uint64(0), reverse(unlead(k.alphabet[0], value))
 	for i, char := range value {
-		index, ok := k.model[char]
+		index, ok := k.indexOf[char]
 		if !ok {
 			return 0, fmt.Errorf("key contains a char that isn't "+
 				"set in the alphabet: %c", char)
