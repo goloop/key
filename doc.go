@@ -91,9 +91,9 @@ Example:
 */
 package key
 
-const version = "0.1"
+const version = "v0.0.1"
 
 // Version returns the version of the module.
 func Version() string {
-	return "v" + version
+	return version
 }

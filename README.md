@@ -1,9 +1,9 @@
-[//]: # (!!!Don't modify the README.md, use `make readme` to generate it!!!)
+[//]: # (!!!Don't modify the README.md, use `make readme` to change/generate one!!!)
 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/scs/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/key)
 
-*Version: 0.1*
+*Version: v0.0.1*
 
 
 # Key
@@ -105,6 +105,7 @@ Example:
 
     const Alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 
+Alphabet is default sequence.
 
 #### func  Version
 
