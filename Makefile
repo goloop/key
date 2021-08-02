@@ -68,7 +68,7 @@ ifeq (, $(shell which godocdown))
 	@go get github.com/robertkrimen/godocdown/godocdown
 endif
 	@godocdown -plain=true -template=.godocdown.md ./ | \
-		sed -e 's/\.ModuleVersion/${MODULE_VERSION}/g' > README.md
+		sed -e 's/\.ModuleVersion/v${MODULE_VERSION}/g' > README.md
 git.commit: readme
 ifeq ($(am),)
 	@echo "You must provide a message to commit as: make commit am='Commit message'"
