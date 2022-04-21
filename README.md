@@ -62,14 +62,11 @@ import (
 
 func main() {
 
-    var (
-    	size = 3
-    	alphabet = []rune{'a', 'b', 'c', 'd', 'e'}
-    )
-
-    k := key.Key(size, alphabet...)
-    v, _ := k.Marshal(122) // v == eec
+    k, _ := key.New(3, 'a', 'b', 'c', 'd', 'e')
+    v, _ := k.Marshal(122)     // v == eec
     i, _ := k.Unmarshal("eec") // i == 122
+
+    // ...
 
 }
 
@@ -88,7 +85,7 @@ Example:
 ```go
 
     // Size not specified.
-    k = key.New(0, 'a', 'b', 'c')
+    k, _ := key.New(0, 'a', 'b', 'c')
     k.Marshal(1) // "b", <nil>
     k.Marshal(10) // "bab", <nil>
     k.Marshal(100) // "bacab", <nil>
