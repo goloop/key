@@ -71,7 +71,7 @@ endif
 		sed -e 's/\.ModuleVersion/v${MODULE_VERSION}/g' > README.md
 git.commit: readme
 ifeq ($(am),)
-	@echo "You must provide a message to commit as: make commit am='Commit message'"
+	@echo "You must provide a message to commit as: make git.commit am='Commit message'"
 else
 	@git add . && git commit -am "${am}" && \
 		git tag v${MODULE_VERSION} && \
