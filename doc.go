@@ -55,7 +55,8 @@ func main() {
     v, _ := k.Marshal(122)     // v == eec
     i, _ := k.Unmarshal("eec") // i == 122
 
-    // ...
+    fmt.Println(v, i)
+    // Output: eec 122
 }
 
 ```
