@@ -57,7 +57,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/goloop/key/v1"
+	"github.com/goloop/key"
 )
 
 func main() {
