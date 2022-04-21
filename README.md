@@ -5,6 +5,7 @@
 
 *Version: v0.0.3*
 
+**not supported**
 
 # Key
 
