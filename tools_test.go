@@ -55,7 +55,7 @@ func TestUnlead(t *testing.T) {
 }
 
 func TestShuffle(t *testing.T) {
-	var abc = []rune{'a', 'b', 'c'}
+	var abc = []rune{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'}
 
 	origin := make([]rune, len(abc))
 	copy(origin, abc)

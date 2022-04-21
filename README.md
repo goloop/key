@@ -3,7 +3,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/scs/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/key)
 
-*Version: v0.0.2*
+*Version: v0.0.3*
 
 
 # Key
@@ -67,7 +67,7 @@ func main() {
     	alphabet = []rune{'a', 'b', 'c', 'd', 'e'}
     )
 
-    k := Key(size, alphabet...)
+    k := key.Key(size, alphabet...)
     v, _ := k.Marshal(122) // v == eec
     i, _ := k.Unmarshal("eec") // i == 122
 
@@ -103,10 +103,6 @@ Example:
 
 ## Usage
 
-    const Alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
-
-Alphabet is default sequence.
-
 #### func  Version
 
     func Version() string
@@ -119,32 +115,38 @@ Version returns the version of the module.
     }
 
 
-Key ...
+Key is a key object.
 
 #### func  New
 
     func New(size uint, alphabet ...rune) (*Key, error)
 
-New returns a Key object with the specified parameters, if an error occurs, the
-second value contains the error message.
+New returns a pointer to the Key object as the first value. The second value can
+contains an error if something went wrong.
+
+The function takes size of key as first argument. If any positive value greater
+than zero is specified the key length will match this value. Otherwise, if the
+size is set to zero - the key size will be dynamic, i.e. the minimum key size
+will be one character and the maximum will depend on the length of the alphabet
+and the possible maximum index of the iteration.
+
+Second, third, etc. is optional arguments of function. These are the elements of
+the sequence for permutation (alphabet). If the custom alphabet is missing, will
+be used an alphabet that randomly generated from the characters a-z and 0-9. The
+alphabet should not contain duplicate values.
 
 #### func (*Key) Alphabet
 
     func (k *Key) Alphabet() []rune
 
-Alphabet returns current alphabet.
+Alphabet returns current alphabet as rune slice.
 
 #### func (*Key) IsValid
 
     func (k *Key) IsValid() bool
 
-IsValid returns true if Key object is valid.
-
-#### func (*Key) LastID
-
-    func (k *Key) LastID() uint64
-
-LastID returns the last available ID in the sequence.
+IsValid returns true if Key object is valid. True only when the New method was
+executed without error.
 
 #### func (*Key) Marshal
 
@@ -157,6 +159,14 @@ Marshal returns the key (sequence element) by ID.
     func (k *Key) Size() uint
 
 Size return size of the key.
+
+#### func (*Key) Total
+
+    func (k *Key) Total() uint64
+
+Total returns the highest possible iteration number. For example, for "abc"
+alphabet and 3 key size can be created the 27 iterations: aaa, aab, aac, ...,
+cca, ccb, ccc. So indexs as 0 <= ID < Totla() can be used to generate a key.
 
 #### func (*Key) Unmarshal
 

@@ -56,7 +56,7 @@ func main() {
 		alphabet = []rune{'a', 'b', 'c', 'd', 'e'}
 	)
 
-	k := Key(size, alphabet...)
+	k := key.Key(size, alphabet...)
 	v, _ := k.Marshal(122) // v == eec
 	i, _ := k.Unmarshal("eec") // i == 122
 }
@@ -91,7 +91,7 @@ Example:
 */
 package key
 
-const version = "0.0.2"
+const version = "0.0.3"
 
 // Version returns the version of the module.
 func Version() string {
