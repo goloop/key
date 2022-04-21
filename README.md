@@ -54,20 +54,17 @@ Examples:
 package main
 
 import (
-
     "fmt"
     "github.com/goloop/key"
-
 )
 
 func main() {
-
     k, _ := key.New(3, 'a', 'b', 'c', 'd', 'e')
     v, _ := k.Marshal(122)     // v == eec
     i, _ := k.Unmarshal("eec") // i == 122
 
-    // ...
-
+    fmt.Println(v, i)
+    // Output: eec 122
 }
 
 ```
