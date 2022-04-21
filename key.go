@@ -1,42 +1,37 @@
 package key
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 )
 
-// The defaultAlphabetCharacters the string of characters from which
-// the alphabet will be generated if the user doesn't set a custom one.
-const defaultAlphabetCharacters = "abcdefghijklmnopqrstuvwxyz0123456789"
-
-// New returns a pointer to the Key object as the first value.
-// The second value can contains an error if something went wrong.
+// New returns a pointer to a Locksmith object as the first value and
+// an error if something went wrong, or nil as the second value.
 //
-// The function takes size of key as first argument. If any positive value
-// greater than zero is specified the key length will match this value.
-// Otherwise, if the size is set to zero - the key size will be dynamic, i.e.
-// the minimum key size will be one character and the maximum will depend on
-// the length of the alphabet and the possible maximum index of the iteration.
+// As the first argument, the function takes the size of the key.
+// If the size of the key is set to zero, the key size will be dynamic, i.e.
+// the minimum key size will be one character, and the maximum will depend
+// on the length of the alphabet and the possible maximum iteration index.
 //
-// Second, third, etc. is optional arguments of function.
-// These are the elements of the sequence for permutation (alphabet).
-// If the custom alphabet is missing, will be used an alphabet that
-// randomly generated from the characters a-z and 0-9.
-// The alphabet should not contain duplicate values.
-func New(size uint, alphabet ...rune) (*Key, error) {
-	var key *Key
+// The second value is the sequence elements for permutation (alphabet).
+// The alphabet mustn't contain duplicate chars or be empty.
+func New(size uint, alphabet string) (*Locksmith, error) {
+	var locksmith *Locksmith
 
-	// Generate default alphabet if custom one is missing.
+	// The alphabet must contain at least one character.
 	if len(alphabet) == 0 {
-		// Use a standard sequence of characters to generate the alphabet.
-		// The alphabet should to be shuffled. Two different objects must
-		// have a different alphabet.
-		alphabet = shuffle([]rune(defaultAlphabetCharacters))
+		return nil, errors.New("blank alphabet string")
 	}
 
-	// Create a pointer to the Key object.
-	key = &Key{size: size, alphabet: alphabet, indexOf: make(map[rune]int)}
+	// Create a pointer to the Locksmith object.
+	locksmith = &Locksmith{
+		size:     size,
+		alphabet: []rune(alphabet),
+		indexOf:  make(map[rune]int),
+		total:    uint64(math.MaxUint64), // recalculate below if size != 0
+	}
 
 	// In the operation of the algorithm, it is necessary to determine the
 	// character in the sequence by the specified index (just slice[index]),
@@ -49,115 +44,111 @@ func New(size uint, alphabet ...rune) (*Key, error) {
 	// This requires quite a bit more memory to store a copy of the
 	// alphabet with the matches but increases the speed of the
 	// algorithm as a whole.
-	for i, char := range alphabet {
+	for i, char := range locksmith.alphabet {
 		// Check the presence of duplicates in the alphabet.
-		// The alphabet should not contain duplicates.
-		if _, ok := key.indexOf[char]; ok {
-			return nil, fmt.Errorf("some elements of the alphabet "+
-				"are repeated: %c", char)
+		// The alphabet shouldn't contain duplicates.
+		if _, ok := locksmith.indexOf[char]; ok {
+			return nil, fmt.Errorf(
+				"the %c item is repeated in the alphabet",
+				char,
+			)
 		}
 
-		key.indexOf[char] = i
+		locksmith.indexOf[char] = i
 	}
 
-	return key, nil
+	// If the size is set to zero - the key size will be dynamic.
+	// The dynamic index iteration is limited to MaxUint64 size.
+	//
+	// Otherwise the value of the last iteration index is calculated
+	// according to the formula L to the power of S, where L is the
+	// size of the alphabet, and S is the size of the key. But and
+	// this value is limited to MaxUint64 too.
+	if locksmith.size != 0 {
+		l, s := float64(len(locksmith.alphabet)), float64(locksmith.size)
+		if total := uint64(math.Pow(l, s)); total < math.MaxUint64 {
+			locksmith.total = total
+		}
+	}
+
+	return locksmith, nil
 }
 
-// Key is a key object.
-type Key struct {
-	// size is the length of the generated key
-	size uint
-
-	// alphabet is a list of characters to generate the key
-	alphabet []rune
-
-	// indexOf it the map of matching alphabet characters as
-	// character and index (as well as an alphabet duplicate checker tool)
-	indexOf map[rune]int
+// Locksmith is a key generation object.
+type Locksmith struct {
+	size     uint         // length of the generated key
+	total    uint64       // maximum allowable key value
+	alphabet []rune       // list of characters to generate the key
+	indexOf  map[rune]int // the map of matching characters of alphabet
 }
 
-// IsValid returns true if Key object is valid.
-// True only when the New method was executed without error.
-func (k *Key) IsValid() bool {
-	return len(k.alphabet) > 0 && len(k.alphabet) == len(k.indexOf)
+// IsValid returns true if Locksmith object is valid.
+func (ls *Locksmith) IsValid() bool {
+	return len(ls.alphabet) > 0 && len(ls.alphabet) == len(ls.indexOf)
 }
 
-// Alphabet returns current alphabet as rune slice.
-func (k *Key) Alphabet() []rune {
-	return k.alphabet
+// Alphabet returns current alphabet value.
+func (ls *Locksmith) Alphabet() string {
+	return string(ls.alphabet)
 }
 
 // Size return size of the key.
-func (k *Key) Size() uint {
-	return k.size
+func (ls *Locksmith) Size() uint {
+	return ls.size
 }
 
 // Total returns the highest possible iteration number.
-// For example, for "abc" alphabet and 3 key size can be created
-// the 27 iterations: aaa, aab, aac, ..., cca, ccb, ccc.
-// So indexs as 0 <= ID < Totla() can be used to generate a key.
-func (k *Key) Total() uint64 {
-	// If the size is set to zero - the key size is dynamic.
-	// Dynamic index iteration is limited to MaxUint64 size.
-	if k.size == 0 {
-		return math.MaxUint64
-	}
-
-	// The value of the last iteration index is calculated according to the
-	// formula A to the power of S, where A is the size of the alphabet,
-	// and S is the size of the key.
-	//
-	// But this value is limited to MaxUint64 size too.
-	tmp := math.Pow(float64(len(k.alphabet)), float64(k.size))
-	if tmp > math.MaxUint64 {
-		return math.MaxUint64
-	}
-
-	return uint64(tmp)
+//
+// For example, for "abc" alphabet and key size as 3 - can be
+// created the 27 iterations: aaa, aab, aac, ..., cca, ccb, ccc.
+// So can be used indexs as 0 <= ID < 27 to generate a key.
+func (ls *Locksmith) Total() uint64 {
+	return ls.total
 }
 
 // Marshal returns the key (sequence element) by ID.
-func (k *Key) Marshal(id uint64) (string, error) {
+func (ls *Locksmith) Marshal(id uint64) (string, error) {
 	var result string
 
-	if id > k.Total() {
-		return "", fmt.Errorf("large ID for key generation: %d", id)
+	if id > ls.Total() {
+		return "", fmt.Errorf("%d is large ID for key generation", id)
 	}
 
 	// Create key.
-	al := len(k.alphabet)
+	al := len(ls.alphabet)
 	l, r := int(id/uint64(al)), int(math.Mod(float64(id), float64(al)))
-	result = string(k.alphabet[r])
+	result = string(ls.alphabet[r])
 	for l >= al {
 		l, r = l/al, int(math.Mod(float64(l), float64(al)))
-		result = string(k.alphabet[r]) + result
+		result = string(ls.alphabet[r]) + result
 	}
 
-	// Only if there is a balance.
+	// If there is a balance only.
 	if l != 0 {
-		result = string(k.alphabet[l]) + result
+		result = string(ls.alphabet[l]) + result
 	}
 
 	// Create the right size wrench.
-	if repeat := int(k.size) - len(result); k.size > 0 && repeat > 0 {
-		result = strings.Repeat(string(k.alphabet[0]), repeat) + result
+	if repeat := int(ls.size) - len(result); ls.size > 0 && repeat > 0 {
+		result = strings.Repeat(string(ls.alphabet[0]), repeat) + result
 	}
 
 	return result, nil
 }
 
 // Unmarshal returns ID of the specified sequence.
-func (k *Key) Unmarshal(key string) (uint64, error) {
+func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
 	var value = []rune(key)
 
-	if k.size > 0 && uint(len(value)) != k.size {
+	// The key is the wrong size.
+	if l := uint(len(value)); ls.size > 0 && l != ls.size {
 		return 0, fmt.Errorf("invalid key length, "+
-			"max %d but %d", k.size, len(value))
+			"must be %d char(s) but %d char(s)", ls.size, l)
 	}
 
-	id, value := uint64(0), reverse(unlead(k.alphabet[0], value))
+	id, value := uint64(0), reverse(unlead(ls.alphabet[0], value))
 	for i, char := range value {
-		index, ok := k.indexOf[char]
+		index, ok := ls.indexOf[char]
 		if !ok {
 			return 0, fmt.Errorf("key contains a char that isn't "+
 				"set in the alphabet: %c", char)
@@ -168,7 +159,7 @@ func (k *Key) Unmarshal(key string) (uint64, error) {
 			continue
 		}
 
-		iter := int(math.Pow(float64(len(k.alphabet)), float64(i)))
+		iter := int(math.Pow(float64(len(ls.alphabet)), float64(i)))
 		id += uint64(index * iter)
 	}
 
