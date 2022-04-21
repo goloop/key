@@ -53,7 +53,7 @@ func New(size uint, alphabet ...rune) (*Key, error) {
 		// Check the presence of duplicates in the alphabet.
 		// The alphabet should not contain duplicates.
 		if _, ok := key.indexOf[char]; ok {
-			return key, fmt.Errorf("some elements of the alphabet "+
+			return nil, fmt.Errorf("some elements of the alphabet "+
 				"are repeated: %c", char)
 		}
 
