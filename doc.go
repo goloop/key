@@ -3,7 +3,7 @@
 // the specified iteration number.
 package key
 
-const version = "1.0.0"
+const version = "1.1.0"
 
 // Version returns the version of the module.
 func Version() string {

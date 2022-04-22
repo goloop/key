@@ -22,7 +22,7 @@ func New(size uint, alphabet string) (*Locksmith, error) {
 
 	// The alphabet must contain at least one character.
 	if len(alphabet) == 0 {
-		return nil, errors.New("blank alphabet string")
+		return &Locksmith{}, errors.New("blank alphabet string")
 	}
 
 	// Create a pointer to the Locksmith object.
@@ -48,7 +48,7 @@ func New(size uint, alphabet string) (*Locksmith, error) {
 		// Check the presence of duplicates in the alphabet.
 		// The alphabet shouldn't contain duplicates.
 		if _, ok := locksmith.indexOf[char]; ok {
-			return nil, fmt.Errorf(
+			return locksmith, fmt.Errorf(
 				"the %c item is repeated in the alphabet",
 				char,
 			)
@@ -71,20 +71,23 @@ func New(size uint, alphabet string) (*Locksmith, error) {
 		}
 	}
 
+	locksmith.isValid = true
 	return locksmith, nil
 }
 
 // Locksmith is a key generation object.
+// It can be created correctly through the New function only.
 type Locksmith struct {
 	size     uint         // length of the generated key
 	total    uint64       // maximum allowable key value
 	alphabet []rune       // list of characters to generate the key
 	indexOf  map[rune]int // the map of matching characters of alphabet
+	isValid  bool         // true if the object was created correctly
 }
 
 // IsValid returns true if Locksmith object is valid.
 func (ls *Locksmith) IsValid() bool {
-	return len(ls.alphabet) > 0 && len(ls.alphabet) == len(ls.indexOf)
+	return ls.isValid // len(ls.alphabet) > 0 && len(ls.alphabet) == len(ls.indexOf)
 }
 
 // Alphabet returns current alphabet value.
