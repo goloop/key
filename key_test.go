@@ -256,7 +256,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Errorf("Expected id to be %d, got %d", expectedId, id)
 	}
 
-	id, err = ls.Unmarshal("caacbbaabbacbab") // 10000000
+	id, _ = ls.Unmarshal("caacbbaabbacbab") // 10000000
 	expectedId = uint64(10000000)
 	if id != expectedId {
 		t.Errorf("Expected id to be %d, got %d", expectedId, id)
