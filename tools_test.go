@@ -7,7 +7,7 @@ import (
 
 // TestReverse tests the private reverse method.
 func TestReverse(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		value  []rune
 		expect []rune
 	}{
@@ -37,7 +37,7 @@ func TestReverse(t *testing.T) {
 
 // TestUnlead tests the private unlead method.
 func TestUnlead(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		value  []rune
 		expect []rune
 	}{
@@ -51,5 +51,38 @@ func TestUnlead(t *testing.T) {
 		if !reflect.DeepEqual(abc, test.expect) {
 			t.Errorf("expected result %v but %v\n", test.expect, abc)
 		}
+	}
+}
+
+// TestPow tests pow functions.
+func TestPow(t *testing.T) {
+	// Test when the exponent is 0
+	result := pow(2, 0)
+	if result != 1 {
+		t.Errorf("Expected result to be 1, got %d", result)
+	}
+
+	// Test when the exponent is positive
+	result = pow(2, 5)
+	if result != 32 {
+		t.Errorf("Expected result to be 32, got %d", result)
+	}
+
+	// Test when the exponent is negative
+	result = pow(2, -3)
+	if result != 0 {
+		t.Errorf("Expected result to be 0, got %d", result)
+	}
+
+	// Test when the base is negative
+	result = pow(-2, 4)
+	if result != 16 {
+		t.Errorf("Expected result to be 16, got %d", result)
+	}
+
+	// Test when the base is 0
+	result = pow(0, 5)
+	if result != 0 {
+		t.Errorf("Expected result to be 0, got %d", result)
 	}
 }
