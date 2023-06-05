@@ -1,23 +1,23 @@
-[//]: # (!!!Don't modify the README.md, use `make readme` to change/generate one!!!)
-
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-BSD-blue)](https://github.com/goloop/scs/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/key)
-
-*Version: v1.1.0*
+[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/scs/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/key)
 
 # Key
 
-Package key allows to find the sequence that will be formed from the permutation
-of some characters defined in the alphabet by the specified iteration number.
+Package key allows to find the sequence that will be formed from the permutation of some characters defined in the alphabet by the specified iteration number.
 
-For example, the length of the key is 3 characters and there are several
-elements to iterate (alphabet): `a`, `b` and `c`. The package allows to
-answer the following questions:
+The library can be used to create unique string identifiers based on a numeric identifier, or to create short URLs in redirect systems, or to mask certain indexes in data reports, etc.
 
-	- How many maximum possible combinations of permutation of
-	  characters from the alphabet for a given key size?
-	- What is the combination of permutation for N iteration?
-	- What is the iteration index for some combination, such as "abc"?
+## Theory
+
+Use the arbitrary alphabet and size of key can be created a sequence of unique combinations, where each new combination has its unique numeric index (from 0 to N - where the N is maximum number of possible combinations).
+
+If specify the iteration index (for example, it can be ID field from the some table of database) - will be returned the combination (key) for this index. And if the key is specified - decoding allows to determine the iteration index.
+
+For example, the length of the key is 3 characters and there are several elements to iterate (alphabet): `a`, `b` and `c`. The package allows to answer the following questions:
+
+  - How many maximum possible combinations of permutation of
+    characters from the alphabet for a given key size?
+  - What is the combination of permutation for N iteration?
+  - What is the iteration index for some combination, for example "abc"?
 
 For "abc" alphabet and 3 key size can be created the next iterations:
 
@@ -29,24 +29,13 @@ For "abc" alphabet and 3 key size can be created the next iterations:
    24. cca   25. ccb   26. ccc
 ```
 
-So, the maximum number of iterations is 27. For the 10 iteration
-will correspond to the "bab" sequence and for example the "aba"
-combination is the 3 iteration.
+So, the maximum number of iterations is 27. For the 10 iteration will correspond to the "bab" sequence and for example the "aba" combination is the 3 iteration.
 
-## Theory
+## Install
 
-Use the arbitrary alphabet and size of key can be created a sequence of
-unique combinations, where each new combination has its unique numeric index
-(from 0 to N - where the N is maximum number of possible combinations).
+Install key:
 
-If specify the iteration index (for example, it can be ID field from
-the some table of database) - will be returned the combination (key)
-for this index. And if the key is specified - decoding allows to
-determine the iteration index.
-
-Install:
-
-```
+```shell
 $ go get github.com/goloop/key
 ```
 
@@ -61,10 +50,10 @@ import (
 )
 
 func main() {
-    ls, _ := key.New(3, "abcde")
+    ls, _ := key.New("abcde", 3)
     v, _ := ls.Marshal(122)     // eec
     i, _ := ls.Unmarshal("eec") // 122
-    
+
     fmt.Println(v, i)
     // Output: eec 122
 }
@@ -76,82 +65,67 @@ to unknown length (depends on the size of the alphabet).
 Example:
 
 ```go
-    ls, _ = key.New(0, "abc") // size not specified
-    ls.Marshal(1) // "b", <nil>
-    ls.Marshal(10) // "bab", <nil>
-    ls.Marshal(100) // "bacab", <nil>
-    ls.Marshal(1000) // "bbabaab", <nil>
-    ls.Marshal(10000) // "bbbcabbab", <nil>
-    ls.Marshal(100000) // "bcaacabbcab", <nil>
-    ls.Marshal(1000000) // "bcbccbacacaab", <nil>
-    ls.Marshal(10000000) // "caacbbaabbacbab", <nil>
+ls, _ = key.New("abc") // size not specified
+ls.Marshal(1)        // "b", <nil>
+ls.Marshal(10)       // "bab", <nil>
+ls.Marshal(100)      // "bacab", <nil>
+ls.Marshal(1000)     // "bbabaab", <nil>
+ls.Marshal(10000)    // "bbbcabbab", <nil>
+ls.Marshal(100000)   // "bcaacabbcab", <nil>
+ls.Marshal(1000000)  // "bcbccbacacaab", <nil>
+ls.Marshal(10000000) // "caacbbaabbacbab", <nil>
+
+ls.Unmarshal("b")               // 1, <nil>
+ls.Unmarshal("bab")             // 10, <nil>
+ls.Unmarshal("bacab")           // 100, <nil>
+ls.Unmarshal("bbabaab")         // 1000, <nil>
+ls.Unmarshal("bbbcabbab")       // 10000, <nil>
+ls.Unmarshal("bcaacabbcab")     // 100000, <nil>
+ls.Unmarshal("bcbccbacacaab")   // 1000000, <nil>
+ls.Unmarshal("caacbbaabbacbab") // 10000000, <nil>
 ```
 
-## Usage
+## Functions
 
-#### func  Version
+- **New**(size uint, alphabet string) (*Locksmith, error)
 
-    func Version() string
+  New returns a pointer to a Locksmith object as the first value and an error if something went wrong, or nil as the second value.
 
-Version returns the version of the module.
+  As the first argument, the function takes the size of the key. If the size of the key is set to zero, the key size will be dynamic, i.e. the minimum key size will be one character, and the maximum will depend on the length of the alphabet and the possible maximum iteration index.
 
-#### type Locksmith
+  The second value is the sequence elements for permutation (alphabet). The alphabet mustn't contain duplicate chars or be empty.
 
-    type Locksmith struct {}
 
-Locksmith is a key generation object.
+## Locksmith Methods
 
-#### func  New
+The Locksmith struct represents a key generation object. It provides methods for working with keys, including generating keys from IDs and retrieving IDs from keys.
 
-    func New(size uint, alphabet string) (*Locksmith, error)
+### Alphabet
 
-New returns a pointer to a Locksmith object as the first value and an error if
-something went wrong, or nil as the second value.
+- **Alphabet**() string
 
-As the first argument, the function takes the size of the key. If the size of
-the key is set to zero, the key size will be dynamic, i.e. the minimum key size
-will be one character, and the maximum will depend on the length of the alphabet
-and the possible maximum iteration index.
+  The `Alphabet` method returns the current alphabet value used by the Locksmith object. The alphabet is a string of unique characters from which the keys will be generated.
 
-The second value is the sequence elements for permutation (alphabet). The
-alphabet mustn't contain duplicate chars or be empty.
+- **Size**() uint64
 
-#### func (*Locksmith) Alphabet
+  The Size method returns the size of the key set for the Locksmith object. If the size is set to zero, the key size will be dynamic, meaning it can vary depending on the ID.
 
-    func (ls *Locksmith) Alphabet() string
+- **Total**() uint64
 
-Alphabet returns current alphabet value.
+  The Total method returns the highest possible iteration number for the Locksmith object. It represents the total number of possible keys that can be generated.
 
-#### func (*Locksmith) IsValid
+- **Marshal**(id uint64) (string, error)
 
-    func (ls *Locksmith) IsValid() bool
+  The Marshal method converts an ID into a key. It takes an ID as input and generates a corresponding key based on the Locksmith's alphabet and size.
 
-IsValid returns true if Locksmith object is valid.
+  The id is the ID to be converted into a key.
 
-#### func (*Locksmith) Marshal
+  The method returns a string representing the generated key and an error if something went wrong. If the function is successful, the error will be nil.
 
-    func (ls *Locksmith) Marshal(id uint64) (string, error)
+- **Unmarshal**(key string) (uint64, error)
 
-Marshal returns the key (sequence element) by ID.
+  The Unmarshal method decodes a key and returns its corresponding ID. It converts a key back into its ID. The key should be a string composed of characters from the Locksmith's alphabet.
 
-#### func (*Locksmith) Size
+  The key is the key to be decoded into an ID.
 
-    func (ls *Locksmith) Size() uint
-
-Size return size of the key.
-
-#### func (*Locksmith) Total
-
-    func (ls *Locksmith) Total() uint64
-
-Total returns the highest possible iteration number.
-
-For example, for "abc" alphabet and key size as 3 - can be created the 27
-iterations: aaa, aab, aac, ..., cca, ccb, ccc. So can be used indexs as 0 <= ID
-< 27 to generate a key.
-
-#### func (*Locksmith) Unmarshal
-
-    func (ls *Locksmith) Unmarshal(key string) (uint64, error)
-
-Unmarshal returns ID of the specified sequence.
+  The method returns an integer representing the decoded ID and an error if something went wrong. If the function is successful, the error will be nil.

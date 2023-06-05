@@ -2,81 +2,51 @@ package key
 
 import (
 	"math"
-	"strings"
 	"testing"
 )
 
-// TestVersion tests the package version.
-// Note: each time you change the major version, you need to fix the tests.
-func TestVersion(t *testing.T) {
-	var expected = "v1." // change it for major version
-
-	version := Version()
-	if strings.HasPrefix(version, expected) != true {
-		t.Error("incorrect version")
+// TestNew tests New function.
+func TestNew(t *testing.T) {
+	// Test when the alphabet is empty
+	_, err := New("")
+	if err == nil {
+		t.Error("Expected an error when the alphabet is empty")
 	}
 
-	if len(strings.Split(version, ".")) != 3 {
-		t.Error("version format should be as " +
-			"v{major_version}.{minor_version}.{patch_version}")
+	// Test when the alphabet has duplicate characters
+	_, err = New("abcabc")
+	if err == nil {
+		t.Error("Expected an error when the alphabet has duplicates")
 	}
-}
 
-// TestNewWithEmptyAlphabet tests New method with empty alphabet.
-func TestNewWithEmptyAlphabet(t *testing.T) {
-	if _, err := New(3, ""); err == nil {
-		t.Error("the alphabet cannot be empty")
+	// Test when the size is less than zero
+	_, err = New("abc", -1)
+	if err == nil {
+		t.Error("Expected an error when the size is less than zero")
 	}
-}
 
-// TestNewWithDuplicateCharacters tests New method with duplicate
-// characters in alphabet.
-func TestNewWithDuplicateCharacters(t *testing.T) {
-	if _, err := New(3, "abcade"); err == nil {
-		t.Error("duplicates in the alphabet are not allowed")
-	}
-}
-
-// TestAlphabet tests Alphabet method.
-func TestAlphabet(t *testing.T) {
-	ls, err := New(3, "abc")
+	// Test when the alphabet and size are valid
+	ls, err := New("abc", 3)
 	if err != nil {
-		t.Error(err)
-	}
-
-	if ls.Alphabet() != "abc" {
-		t.Error("the alphabet doesn't match")
-	}
-}
-
-// TestSize tests Size method.
-func TestSize(t *testing.T) {
-	ls, err := New(3, "abc")
-	if err != nil {
-		t.Error(err)
+		t.Errorf("Got unexpected error: %v", err)
 	}
 
 	if ls.Size() != 3 {
-		t.Error("the size doesn't match")
+		t.Errorf("Expected size to be 3, got %d", ls.Size())
 	}
-}
 
-// TestTotal tests Total method.
-func TestTotal(t *testing.T) {
-	ls, err := New(3, "abc")
-	if err != nil {
-		t.Error(err)
+	if ls.Alphabet() != "abc" {
+		t.Errorf("Expected alphabet to be 'abc', got %s", ls.Alphabet())
 	}
 
 	if ls.Total() != 27 {
-		t.Error("for key size as 3 and alphabet from 3 chars, " +
-			"the total must be as 27")
+		t.Errorf("Expected total to be 27, got %d", ls.Total())
 	}
 }
 
 // TestTotalMax tests Total method with 0 size of key.
 func TestTotalMax(t *testing.T) {
-	ls, err := New(0, "abc")
+	ls, err := New("abc")
 	if err != nil {
 		t.Error(err)
 	}
@@ -88,7 +58,7 @@ func TestTotalMax(t *testing.T) {
 
 // TestMarshalOverflow overflow testing Marshal method.
 func TestMarshalOverflow(t *testing.T) {
-	ls, err := New(3, "abc")
+	ls, err := New("abc", 3)
 	if err != nil {
 		t.Error(err)
 	}
@@ -99,10 +69,10 @@ func TestMarshalOverflow(t *testing.T) {
 	}
 }
 
-// TestMarshal tests Marshal method.
-func TestMarshal(t *testing.T) {
-	var tests = []struct {
-		size   uint
+// TestMarshalLogic tests Marshal method.
+func TestMarshalLogic(t *testing.T) {
+	tests := []struct {
+		size   int
 		value  uint64
 		expect string
 	}{
@@ -115,7 +85,7 @@ func TestMarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ls, err := New(test.size, "abcdefghijklmnopqrstuvwxyz0123456789")
+		ls, err := New("abcdefghijklmnopqrstuvwxyz0123456789", test.size)
 		if err != nil {
 			t.Error(err)
 		}
@@ -131,9 +101,55 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
+func TestMarshal(t *testing.T) {
+	// Test when the id is larger than the total number of keys.
+	ls, _ := New("abc", 3)
+	_, err := ls.Marshal(1000) // this will be more than total keys for size 3
+	if err == nil {
+		t.Error("Expected an error when the id is larger than total keys")
+	}
+
+	// Test when the id is valid and size is fixed
+	key, err := ls.Marshal(13) // bbb
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	// Check key.
+	if key != "bbb" {
+		t.Errorf("Expected %s, got %s", "bbb", key)
+	}
+
+	if len(key) != 3 {
+		t.Errorf("Expected key to be of length 3, got %d", len(key))
+	}
+
+	// Test when the size is zero (i.e., dynamic size).
+	ls, _ = New("abc")
+	key, err = ls.Marshal(10) // bab
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	// Check key.
+	if key != "bab" {
+		t.Errorf("Expected %s, got %s", "bab", key)
+	}
+
+	// The key length should be less than or equal to 3.
+	if len(key) > 3 {
+		t.Errorf("Expected key to be of length <= 3, got %d", len(key))
+	}
+
+	key, _ = ls.Marshal(10000000) // caacbbaabbacbab
+	if key != "caacbbaabbacbab" {
+		t.Errorf("Expected %s, got %s", "caacbbaabbacbab", key)
+	}
+}
+
 // TestUnmarshalWrongSize tests Unmarshal method with wrong size of key.
 func TestUnmarshalWrongSize(t *testing.T) {
-	ls, err := New(3, "abc")
+	ls, err := New("abc", 3)
 	if err != nil {
 		t.Error(err)
 	}
@@ -146,7 +162,7 @@ func TestUnmarshalWrongSize(t *testing.T) {
 
 // TestUnmarshalWrongChar tests Unmarshal method with wrong char in the key.
 func TestUnmarshalWrongChar(t *testing.T) {
-	ls, err := New(3, "abc")
+	ls, err := New("abc", 3)
 	if err != nil {
 		t.Error(err)
 	}
@@ -157,10 +173,10 @@ func TestUnmarshalWrongChar(t *testing.T) {
 	}
 }
 
-// TestUnmarshal tests Unmarshal method.
-func TestUnmarshal(t *testing.T) {
-	var tests = []struct {
-		size   uint
+// TestUnmarshalLogic tests Unmarshal method.
+func TestUnmarshalLogic(t *testing.T) {
+	tests := []struct {
+		size   int
 		value  string
 		expect uint64
 	}{
@@ -173,7 +189,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ls, err := New(test.size, "abcdefghijklmnopqrstuvwxyz0123456789")
+		ls, err := New("abcdefghijklmnopqrstuvwxyz0123456789", test.size)
 		if err != nil {
 			t.Error(err)
 		}
@@ -189,10 +205,60 @@ func TestUnmarshal(t *testing.T) {
 	}
 }
 
-// TestIsValis tests IsValid mthod.
-func TestIsValid(t *testing.T) {
-	ls := &Locksmith{}
-	if ls.IsValid() {
-		t.Error("an empty Locksmith object cannot be valid")
+func TestUnmarshal(t *testing.T) {
+	// Test when the key is not of the correct length.
+	ls, _ := New("abc", 3)
+	_, err := ls.Unmarshal("ab") // this is not of length 3
+	if err == nil {
+		t.Error("Expected an error when the key is not of the correct length")
+	}
+
+	// Test when the key contains a character not in the alphabet.
+	_, err = ls.Unmarshal("abd") // 'd' is not in the alphabet
+	if err == nil {
+		t.Error("Expected an error when the key contains " +
+			"a character not in the alphabet")
+	}
+
+	// Test when the key is valid and size is fixed.
+	id, err := ls.Unmarshal("aab")
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	// The ID should match the ID we used in the Marshal test.
+	expectedId := uint64(1)
+	if id != expectedId {
+		t.Errorf("Expected id to be %d, got %d", expectedId, id)
+	}
+
+	// Test when the size is zero (i.e., dynamic size).
+	ls, _ = New("abc")
+	id, err = ls.Unmarshal("bab") // id 10
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	// The ID should match the ID we used in the Marshal test.
+	expectedId = uint64(10)
+	if id != expectedId {
+		t.Errorf("Expected id to be %d, got %d", expectedId, id)
+	}
+
+	id, err = ls.Unmarshal("bbb") // id 13
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	// The ID should match the ID we used in the Marshal test.
+	expectedId = uint64(13)
+	if id != expectedId {
+		t.Errorf("Expected id to be %d, got %d", expectedId, id)
+	}
+
+	id, err = ls.Unmarshal("caacbbaabbacbab") // 10000000
+	expectedId = uint64(10000000)
+	if id != expectedId {
+		t.Errorf("Expected id to be %d, got %d", expectedId, id)
 	}
 }
