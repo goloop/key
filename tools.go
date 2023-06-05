@@ -27,3 +27,23 @@ func unlead(lead rune, v []rune) []rune {
 
 	return v[seek:]
 }
+
+// Pow calculates the exponentiation of a base to an exponent using
+// binary exponentiation. It returns the result of base raised to
+// the power of exponent.
+func pow(base, exponent int) int {
+	if exponent < 0 {
+		return 0
+	}
+
+	result := 1
+	for exponent > 0 {
+		if exponent&1 == 1 {
+			result *= base
+		}
+		base *= base
+		exponent >>= 1
+	}
+
+	return result
+}

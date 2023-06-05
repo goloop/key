@@ -97,8 +97,8 @@ func New(alphabet string, args ...int) (*Locksmith, error) {
 	// size of the alphabet, and S is the size of the key. But and
 	// this value is limited to MaxUint64 too.
 	if locksmith.size != 0 {
-		l, s := float64(len(locksmith.alphabet)), float64(locksmith.size)
-		if total := uint64(math.Pow(l, s)); total < math.MaxUint64 {
+		l, s := len(locksmith.alphabet), int(locksmith.size)
+		if total := uint64(pow(l, s)); total < math.MaxUint64 {
 			locksmith.total = total
 		}
 	}
@@ -227,9 +227,9 @@ func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
 				"set in the alphabet: %c", char)
 		}
 
-		// Replacing loop with math.Pow.
-		power := math.Pow(float64(alphabetLength), float64(i))
-		id += uint64(float64(index) * power)
+		// Replacing math.Pow with custom pow.
+		power := pow(alphabetLength, i)
+		id += uint64(index * power)
 	}
 
 	return id, nil
