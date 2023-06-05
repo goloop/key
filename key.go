@@ -7,27 +7,59 @@ import (
 	"strings"
 )
 
-// New returns a pointer to a Locksmith object as the first value and
-// an error if something went wrong, or nil as the second value.
+// New returns a new Locksmith object. It takes in three arguments:
+// alphabet (string) and size (int).
 //
-// As the first argument, the function takes the size of the key.
-// If the size of the key is set to zero, the key size will be dynamic, i.e.
-// the minimum key size will be one character, and the maximum will depend
-// on the length of the alphabet and the possible maximum iteration index.
+//   - alphabet is a string of unique characters from which the keys will
+//     be generated. It must contain at least 2 unique characters and no
+//     duplicates.
 //
-// The second value is the sequence elements for permutation (alphabet).
-// The alphabet mustn't contain duplicate chars or be empty.
-func New(size uint, alphabet string) (*Locksmith, error) {
-	var locksmith *Locksmith
+//   - size' is the fixed length of the keys to be generated. If size is
+//     set to zero, the key size will be dynamic, with a minimum size of 1.
+//     In this case, the maximum key size will depend on the length of
+//     the alphabet and the maximum iteration index.
+//
+//     The value can be specified as a sequence of numbers, in this case,
+//     size will be the sum of these numbers New("abc", 1, 2, 3) // size == 6
+//
+//     The size value can be omitted for dynamic keys (or set size as 0).
+//
+// The function returns a pointer to the created Locksmith object and
+// an error if something went wrong, or nil if it was successful.
+//
+// Example usage:
+//
+//	ls, err := New("abc")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	key, err := ls.Marshal(10)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(key) // Output: "bab"
+func New(alphabet string, args ...int) (*Locksmith, error) {
+	var size int64
 
 	// The alphabet must contain at least one character.
 	if len(alphabet) == 0 {
 		return &Locksmith{}, errors.New("blank alphabet string")
 	}
 
+	// Size is a sum of all arguments.
+	// It must be zero or positive value.
+	for _, v := range args {
+		size += int64(v)
+	}
+
+	if size < 0 {
+		return &Locksmith{}, errors.New("incorrect size")
+	}
+
 	// Create a pointer to the Locksmith object.
-	locksmith = &Locksmith{
-		size:     size,
+	locksmith := &Locksmith{
+		size:     uint64(size),
 		alphabet: []rune(alphabet),
 		indexOf:  make(map[rune]int),
 		total:    uint64(math.MaxUint64), // recalculate below if size != 0
@@ -48,7 +80,7 @@ func New(size uint, alphabet string) (*Locksmith, error) {
 		// Check the presence of duplicates in the alphabet.
 		// The alphabet shouldn't contain duplicates.
 		if _, ok := locksmith.indexOf[char]; ok {
-			return locksmith, fmt.Errorf(
+			return &Locksmith{}, fmt.Errorf(
 				"the %c item is repeated in the alphabet",
 				char,
 			)
@@ -71,23 +103,16 @@ func New(size uint, alphabet string) (*Locksmith, error) {
 		}
 	}
 
-	locksmith.isValid = true
 	return locksmith, nil
 }
 
 // Locksmith is a key generation object.
 // It can be created correctly through the New function only.
 type Locksmith struct {
-	size     uint         // length of the generated key
+	size     uint64       // length of the generated key
 	total    uint64       // maximum allowable key value
 	alphabet []rune       // list of characters to generate the key
 	indexOf  map[rune]int // the map of matching characters of alphabet
-	isValid  bool         // true if the object was created correctly
-}
-
-// IsValid returns true if Locksmith object is valid.
-func (ls *Locksmith) IsValid() bool {
-	return ls.isValid // len(ls.alphabet) > 0 && len(ls.alphabet) == len(ls.indexOf)
 }
 
 // Alphabet returns current alphabet value.
@@ -96,7 +121,7 @@ func (ls *Locksmith) Alphabet() string {
 }
 
 // Size return size of the key.
-func (ls *Locksmith) Size() uint {
+func (ls *Locksmith) Size() uint64 {
 	return ls.size
 }
 
@@ -109,11 +134,36 @@ func (ls *Locksmith) Total() uint64 {
 	return ls.total
 }
 
-// Marshal returns the key (sequence element) by ID.
+// Marshal converts an ID into a key. This function takes an ID as
+// input and generates a corresponding key based on the Locksmith's
+// alphabet and size.
+//
+// The ID should be less than the total number of possible keys,
+// otherwise, an error will be returned. The total number of possible
+// keys can be obtained by calling the 'Total' method.
+//
+// If the Locksmith's size is set to a fixed length, the generated key
+// will be padded with the first character of the alphabet to reach the
+// required length. If the size is set to zero (i.e., dynamic size),
+// the key will not be padded and its length will vary depending on the
+// ID.
+//
+// This function returns a string representing the key and an error if
+// something went wrong. If the function is successful, the error will
+// be nil.
+//
+// Example usage:
+//
+//	ls, _ := New("abc")
+//	key, err := ls.Marshal(10)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(key) // Output: "bab"
 func (ls *Locksmith) Marshal(id uint64) (string, error) {
 	var result string
 
-	if id > ls.Total() {
+	if id >= ls.Total() {
 		return "", fmt.Errorf("%d is large ID for key generation", id)
 	}
 
@@ -139,17 +189,37 @@ func (ls *Locksmith) Marshal(id uint64) (string, error) {
 	return result, nil
 }
 
-// Unmarshal returns ID of the specified sequence.
+// Unmarshal decodes a key and returns its corresponding ID.
+// This function converts a key back into its ID. The key should be a
+// string composed of characters from the Locksmith's alphabet.
+//
+// If the Locksmith's size is set to a fixed length, the key must have
+// the same length. If the size is set to zero (i.e., dynamic size), the
+// key can have any length.
+//
+// This function returns an integer representing the ID and an error if
+// something went wrong. If the function is successful, the error will
+// be nil.
+//
+// Example usage:
+//
+//	ls, _ := New("abc")
+//	id, err := ls.Unmarshal("bab")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(id) // Output: 10
 func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
-	var value = []rune(key)
+	value := []rune(key)
 
 	// The key is the wrong size.
-	if l := uint(len(value)); ls.size > 0 && l != ls.size {
+	if l := uint64(len(value)); ls.size > 0 && l != ls.size {
 		return 0, fmt.Errorf("invalid key length, "+
 			"must be %d char(s) but %d char(s)", ls.size, l)
 	}
 
 	id, value := uint64(0), reverse(unlead(ls.alphabet[0], value))
+	alphabetLength := len(ls.alphabet)
 	for i, char := range value {
 		index, ok := ls.indexOf[char]
 		if !ok {
@@ -157,13 +227,9 @@ func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
 				"set in the alphabet: %c", char)
 		}
 
-		if i == 0 {
-			id += uint64(index)
-			continue
-		}
-
-		iter := int(math.Pow(float64(len(ls.alphabet)), float64(i)))
-		id += uint64(index * iter)
+		// Replacing loop with math.Pow.
+		power := math.Pow(float64(alphabetLength), float64(i))
+		id += uint64(float64(index) * power)
 	}
 
 	return id, nil
