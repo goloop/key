@@ -205,6 +205,7 @@ func TestUnmarshalLogic(t *testing.T) {
 	}
 }
 
+// TestUnmarshal tests Unmarshal function.
 func TestUnmarshal(t *testing.T) {
 	// Test when the key is not of the correct length.
 	ls, _ := New("abc", 3)
