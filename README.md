@@ -87,7 +87,7 @@ ls.Unmarshal("caacbbaabbacbab") // 10000000, <nil>
 
 ## Functions
 
-- **New**(size uint, alphabet string) (*Locksmith, error)
+- **New**(alphabet string, size ...uint) (*Locksmith, error)
 
   New returns a pointer to a Locksmith object as the first value and an error if something went wrong, or nil as the second value.
 
