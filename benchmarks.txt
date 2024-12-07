@@ -1,0 +1,21 @@
+goos: linux
+goarch: arm64
+pkg: github.com/goloop/key
+BenchmarkNew/SmallAlphabet-6    	 7299147	       159.0 ns/op	     224 B/op	       4 allocs/op
+BenchmarkNew/MediumAlphabet-6   	 2352681	       513.3 ns/op	     490 B/op	       5 allocs/op
+BenchmarkNew/LargeAlphabet-6    	  515760	      2182 ns/op	    2092 B/op	      10 allocs/op
+BenchmarkNew/DynamicSize-6      	 2319524	       507.3 ns/op	     490 B/op	       5 allocs/op
+BenchmarkMarshal/Small_ID_FixedSize-6         	12924925	        91.67 ns/op	      12 B/op	       3 allocs/op
+BenchmarkMarshal/Medium_ID_FixedSize-6        	 7048216	       168.5 ns/op	      21 B/op	       5 allocs/op
+BenchmarkMarshal/Large_ID_FixedSize-6         	 4399756	       270.0 ns/op	      32 B/op	       6 allocs/op
+BenchmarkMarshal/Small_ID_DynamicSize-6       	12512259	        92.82 ns/op	      12 B/op	       3 allocs/op
+BenchmarkMarshal/Large_ID_DynamicSize-6       	 5597696	       211.8 ns/op	      16 B/op	       4 allocs/op
+BenchmarkUnmarshal/Short_Key_FixedSize-6      	39575840	        30.00 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Medium_Key_FixedSize-6     	19518163	        61.78 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Long_Key_FixedSize-6       	11895498	        98.97 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Short_Key_DynamicSize-6    	38577511	        30.51 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Long_Key_DynamicSize-6     	11932358	        99.64 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParallelOperations/Parallel_Marshal-6         	24539688	        55.69 ns/op	      31 B/op	       5 allocs/op
+BenchmarkParallelOperations/Parallel_Unmarshal-6       	129070941	         9.148 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/goloop/key	22.499s
