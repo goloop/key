@@ -1,236 +1,281 @@
 package key
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"strings"
+	"math/bits"
+	"unicode/utf8"
 )
 
-// New returns a new Locksmith object. It takes in three arguments:
-// alphabet (string) and size (int).
+// stackDigits is the size of the on-stack digit buffer used by Marshal and
+// MarshalAppend. A uint64 needs at most 64 digits (base 2), so any dynamic
+// key and any fixed key up to this length is encoded without a heap
+// allocation. Larger fixed sizes fall back to a single make.
+const stackDigits = 64
+
+// Locksmith encodes uint64 identifiers into string keys and back, using a
+// custom alphabet. It is a generalized base-N positional codec: with an
+// alphabet of length N the value is written in base N, optionally padded to a
+// fixed width with the first alphabet character.
 //
-//   - alphabet is a string of unique characters from which the keys will
-//     be generated. It must contain at least 2 unique characters and no
-//     duplicates.
-//
-//   - size' is the fixed length of the keys to be generated. If size is
-//     set to zero, the key size will be dynamic, with a minimum size of 1.
-//     In this case, the maximum key size will depend on the length of
-//     the alphabet and the maximum iteration index.
-//
-//     The value can be specified as a sequence of numbers, in this case,
-//     size will be the sum of these numbers New("abc", 1, 2, 3) // size == 6
-//
-//     The size value can be omitted for dynamic keys (or set size as 0).
-//
-// The function returns a pointer to the created Locksmith object and
-// an error if something went wrong, or nil if it was successful.
-//
-// Example usage:
-//
-//	ls, err := New("abc")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//
-//	key, err := ls.Marshal(10)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println(key) // Output: "bab"
-func New(alphabet string, args ...int) (*Locksmith, error) {
-	var size int64
-
-	// The alphabet must contain at least one character.
-	if len(alphabet) == 0 {
-		return &Locksmith{}, errors.New("blank alphabet string")
-	}
-
-	// Size is a sum of all arguments.
-	// It must be zero or positive value.
-	for _, v := range args {
-		size += int64(v)
-	}
-
-	if size < 0 {
-		return &Locksmith{}, errors.New("incorrect size")
-	}
-
-	// Create a pointer to the Locksmith object.
-	locksmith := &Locksmith{
-		size:     uint64(size),
-		alphabet: []rune(alphabet),
-		indexOf:  make(map[rune]int),
-		total:    uint64(math.MaxUint64), // recalculate below if size != 0
-	}
-
-	// In the operation of the algorithm, it is necessary to determine the
-	// character in the sequence by the specified index (just slice[index]),
-	// and the character index in the sequence by the character
-	// (like the indexOf method).
-	//
-	// The classical indexOf method iterates over the characters in
-	// the sequence, which slows down the algorithm. Instead, we use
-	// map to store the matched character and index in the sequence.
-	// This requires quite a bit more memory to store a copy of the
-	// alphabet with the matches but increases the speed of the
-	// algorithm as a whole.
-	for i, char := range locksmith.alphabet {
-		// Check the presence of duplicates in the alphabet.
-		// The alphabet shouldn't contain duplicates.
-		if _, ok := locksmith.indexOf[char]; ok {
-			return &Locksmith{}, fmt.Errorf(
-				"the %c item is repeated in the alphabet",
-				char,
-			)
-		}
-
-		locksmith.indexOf[char] = i
-	}
-
-	// If the size is set to zero - the key size will be dynamic.
-	// The dynamic index iteration is limited to MaxUint64 size.
-	//
-	// Otherwise the value of the last iteration index is calculated
-	// according to the formula L to the power of S, where L is the
-	// size of the alphabet, and S is the size of the key. But and
-	// this value is limited to MaxUint64 too.
-	if locksmith.size != 0 {
-		l, s := len(locksmith.alphabet), int(locksmith.size)
-		if total := uint64(pow(l, s)); total < math.MaxUint64 {
-			locksmith.total = total
-		}
-	}
-
-	return locksmith, nil
-}
-
-// Locksmith is a key generation object.
-// It can be created correctly through the New function only.
+// A Locksmith is immutable after construction and therefore safe for
+// concurrent use by multiple goroutines. Build one only through NewDynamic,
+// NewFixed or their Must* counterparts.
 type Locksmith struct {
-	size     uint64       // length of the generated key
-	total    uint64       // maximum allowable key value
-	alphabet []rune       // list of characters to generate the key
-	indexOf  map[rune]int // the map of matching characters of alphabet
+	alphabet []rune       // characters of the alphabet, index == digit value
+	indexOf  map[rune]int // reverse lookup: character -> digit value
+	base     uint64       // len(alphabet); the numeric base
+	size     uint64       // fixed key length; 0 means dynamic length
+	total    uint64       // number of representable ids (saturated to MaxUint64)
+	full     bool         // true when every uint64 id fits the key space
 }
 
-// Alphabet returns current alphabet value.
+// newLocksmith validates the alphabet and builds a Locksmith. size == 0 with
+// dynamic == true selects a variable-length codec; otherwise size is the fixed
+// key width.
+func newLocksmith(alphabet string, size uint64, dynamic bool) (*Locksmith, error) {
+	runes := []rune(alphabet)
+	switch {
+	case len(runes) == 0:
+		return nil, ErrBlankAlphabet
+	case len(runes) < 2:
+		return nil, ErrShortAlphabet
+	}
+
+	// Build the reverse lookup and reject duplicates in one pass. A duplicate
+	// would make two digit values share a character, breaking the bijection.
+	indexOf := make(map[rune]int, len(runes))
+	for i, ch := range runes {
+		if _, dup := indexOf[ch]; dup {
+			return nil, fmt.Errorf("%w: %q", ErrDuplicateChar, ch)
+		}
+		indexOf[ch] = i
+	}
+
+	ls := &Locksmith{
+		alphabet: runes,
+		indexOf:  indexOf,
+		base:     uint64(len(runes)),
+		size:     size,
+	}
+
+	// Determine the size of the key space.
+	//
+	// Dynamic keys can grow as long as needed, so every uint64 is
+	// representable: the space is saturated. For fixed keys the space is
+	// base**size; if that overflows uint64 it is likewise saturated (every
+	// uint64 id fits into size digits). Only a space strictly smaller than
+	// 2**64 has a meaningful, enforced upper bound.
+	if dynamic {
+		ls.full = true
+		ls.total = math.MaxUint64
+		return ls, nil
+	}
+
+	total, overflow := powU64(ls.base, size)
+	if overflow {
+		ls.full = true
+		ls.total = math.MaxUint64
+	} else {
+		ls.total = total
+	}
+
+	return ls, nil
+}
+
+// NewDynamic returns a Locksmith that produces variable-length keys: the key
+// is as short as the value allows, with no padding. The canonical key for
+// zero is the first alphabet character.
+//
+// The alphabet must contain at least two unique characters and no duplicates.
+func NewDynamic(alphabet string) (*Locksmith, error) {
+	return newLocksmith(alphabet, 0, true)
+}
+
+// NewFixed returns a Locksmith that always produces keys of exactly size
+// characters, left-padded with the first alphabet character when the value is
+// short. size must be positive.
+//
+// The alphabet must contain at least two unique characters and no duplicates.
+func NewFixed(alphabet string, size int) (*Locksmith, error) {
+	if size < 1 {
+		return nil, fmt.Errorf("%w: %d", ErrInvalidSize, size)
+	}
+	return newLocksmith(alphabet, uint64(size), false)
+}
+
+// MustNewDynamic is like NewDynamic but panics on error. It is meant for
+// package-level codecs with a constant alphabet, where a bad alphabet is a
+// programming error that should fail at startup.
+func MustNewDynamic(alphabet string) *Locksmith {
+	ls, err := NewDynamic(alphabet)
+	if err != nil {
+		panic(err)
+	}
+	return ls
+}
+
+// MustNewFixed is like NewFixed but panics on error. It is meant for
+// package-level codecs with constant parameters.
+func MustNewFixed(alphabet string, size int) *Locksmith {
+	ls, err := NewFixed(alphabet, size)
+	if err != nil {
+		panic(err)
+	}
+	return ls
+}
+
+// Alphabet returns the alphabet the Locksmith was built with.
 func (ls *Locksmith) Alphabet() string {
 	return string(ls.alphabet)
 }
 
-// Size return size of the key.
+// Size returns the fixed key length, or 0 for a dynamic-length Locksmith.
 func (ls *Locksmith) Size() uint64 {
 	return ls.size
 }
 
-// Total returns the highest possible iteration number.
+// Total returns the number of representable ids: valid ids run from 0 up to
+// Total()-1.
 //
-// For example, for "abc" alphabet and key size as 3 - can be
-// created the 27 iterations: aaa, aab, aac, ..., cca, ccb, ccc.
-// So can be used indexs as 0 <= ID < 27 to generate a key.
+// When the key space is at least 2**64 the value is saturated to MaxUint64
+// and every uint64 id is valid (including MaxUint64 itself); use Saturated to
+// tell that case apart from a space whose true size happens to be MaxUint64.
 func (ls *Locksmith) Total() uint64 {
 	return ls.total
 }
 
-// Marshal converts an ID into a key. This function takes an ID as
-// input and generates a corresponding key based on the Locksmith's
-// alphabet and size.
-//
-// The ID should be less than the total number of possible keys,
-// otherwise, an error will be returned. The total number of possible
-// keys can be obtained by calling the 'Total' method.
-//
-// If the Locksmith's size is set to a fixed length, the generated key
-// will be padded with the first character of the alphabet to reach the
-// required length. If the size is set to zero (i.e., dynamic size),
-// the key will not be padded and its length will vary depending on the
-// ID.
-//
-// This function returns a string representing the key and an error if
-// something went wrong. If the function is successful, the error will
-// be nil.
-//
-// Example usage:
-//
-//	ls, _ := New("abc")
-//	key, err := ls.Marshal(10)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println(key) // Output: "bab"
-func (ls *Locksmith) Marshal(id uint64) (string, error) {
-	var result string
-
-	if id >= ls.Total() {
-		return "", fmt.Errorf("%d is large ID for key generation", id)
-	}
-
-	// Create key.
-	al := len(ls.alphabet)
-	l, r := int(id/uint64(al)), int(math.Mod(float64(id), float64(al)))
-	result = string(ls.alphabet[r])
-	for l >= al {
-		l, r = l/al, int(math.Mod(float64(l), float64(al)))
-		result = string(ls.alphabet[r]) + result
-	}
-
-	// If there is a balance only.
-	if l != 0 {
-		result = string(ls.alphabet[l]) + result
-	}
-
-	// Create the right size wrench.
-	if repeat := int(ls.size) - len(result); ls.size > 0 && repeat > 0 {
-		result = strings.Repeat(string(ls.alphabet[0]), repeat) + result
-	}
-
-	return result, nil
+// Saturated reports whether the key space holds every uint64 id. It is true
+// for any dynamic Locksmith and for a fixed one whose base**size reaches or
+// exceeds 2**64. When true, Marshal never rejects an id.
+func (ls *Locksmith) Saturated() bool {
+	return ls.full
 }
 
-// Unmarshal decodes a key and returns its corresponding ID.
-// This function converts a key back into its ID. The key should be a
-// string composed of characters from the Locksmith's alphabet.
-//
-// If the Locksmith's size is set to a fixed length, the key must have
-// the same length. If the size is set to zero (i.e., dynamic size), the
-// key can have any length.
-//
-// This function returns an integer representing the ID and an error if
-// something went wrong. If the function is successful, the error will
-// be nil.
-//
-// Example usage:
-//
-//	ls, _ := New("abc")
-//	id, err := ls.Unmarshal("bab")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println(id) // Output: 10
-func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
-	value := []rune(key)
-
-	// The key is the wrong size.
-	if l := uint64(len(value)); ls.size > 0 && l != ls.size {
-		return 0, fmt.Errorf("invalid key length, "+
-			"must be %d char(s) but %d char(s)", ls.size, l)
+// writeDigits appends the base-N digits of id to dst, least-significant first,
+// then pads with the lead character up to the fixed size. The caller reverses
+// the written segment to obtain the most-significant-first key.
+func (ls *Locksmith) writeDigits(dst []rune, id uint64) []rune {
+	start := len(dst)
+	for {
+		dst = append(dst, ls.alphabet[id%ls.base])
+		id /= ls.base
+		if id == 0 {
+			break
+		}
 	}
 
-	id, value := uint64(0), reverse(unlead(ls.alphabet[0], value))
-	alphabetLength := len(ls.alphabet)
-	for i, char := range value {
-		index, ok := ls.indexOf[char]
+	for ls.size > 0 && uint64(len(dst)-start) < ls.size {
+		dst = append(dst, ls.alphabet[0])
+	}
+
+	return dst
+}
+
+// Marshal converts an id into its key.
+//
+// For a fixed-length Locksmith the key is left-padded with the first alphabet
+// character to the configured size. For a dynamic one the key is as short as
+// the value allows. An id outside the key space yields ErrIDTooLarge.
+func (ls *Locksmith) Marshal(id uint64) (string, error) {
+	if !ls.full && id >= ls.total {
+		return "", fmt.Errorf("%w: %d", ErrIDTooLarge, id)
+	}
+
+	var stack [stackDigits]rune
+	var buf []rune
+	if ls.size > stackDigits {
+		buf = make([]rune, 0, ls.size)
+	} else {
+		buf = stack[:0]
+	}
+
+	buf = ls.writeDigits(buf, id)
+	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
+		buf[i], buf[j] = buf[j], buf[i]
+	}
+
+	return string(buf), nil
+}
+
+// MarshalAppend encodes id and appends the resulting key (UTF-8 encoded) to
+// dst, returning the extended slice. It mirrors the strconv.Append* family and
+// avoids allocating a fresh string on each call, which is useful when emitting
+// many keys into a shared buffer.
+func (ls *Locksmith) MarshalAppend(dst []byte, id uint64) ([]byte, error) {
+	if !ls.full && id >= ls.total {
+		return dst, fmt.Errorf("%w: %d", ErrIDTooLarge, id)
+	}
+
+	var stack [stackDigits]rune
+	var digits []rune
+	if ls.size > stackDigits {
+		digits = make([]rune, 0, ls.size)
+	} else {
+		digits = stack[:0]
+	}
+
+	digits = ls.writeDigits(digits, id)
+	for i := len(digits) - 1; i >= 0; i-- {
+		dst = utf8.AppendRune(dst, digits[i])
+	}
+
+	return dst, nil
+}
+
+// Unmarshal decodes a key back into its id.
+//
+// Decoding is strict: it enforces a bijection so that each valid key maps to
+// exactly one id and round-trips back to the same key. Concretely it rejects
+//   - the empty string (ErrEmptyKey);
+//   - in fixed mode, a key whose length differs from size (ErrInvalidLength);
+//   - in dynamic mode, redundant leading lead-characters, e.g. "aab"
+//     (ErrNonCanonical);
+//   - a character outside the alphabet (ErrUnknownChar);
+//   - a value that overflows uint64 (ErrKeyOutOfRange).
+func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
+	runes := []rune(key)
+	if len(runes) == 0 {
+		return 0, ErrEmptyKey
+	}
+
+	if ls.size > 0 {
+		if l := uint64(len(runes)); l != ls.size {
+			return 0, fmt.Errorf("%w: want %d char(s), got %d",
+				ErrInvalidLength, ls.size, l)
+		}
+	} else if len(runes) > 1 && runes[0] == ls.alphabet[0] {
+		// Dynamic keys are not padded, so a leading lead-character (other than
+		// the single-character key for zero) is a non-canonical encoding.
+		return 0, fmt.Errorf("%w: redundant leading %q",
+			ErrNonCanonical, ls.alphabet[0])
+	}
+
+	var id uint64
+	for _, ch := range runes {
+		idx, ok := ls.indexOf[ch]
 		if !ok {
-			return 0, fmt.Errorf("key contains a char that isn't "+
-				"set in the alphabet: %c", char)
+			return 0, fmt.Errorf("%w: %q", ErrUnknownChar, ch)
 		}
 
-		// Replacing math.Pow with custom pow.
-		power := pow(alphabetLength, i)
-		id += uint64(index * power)
+		// Horner's scheme with overflow control: id = id*base + idx.
+		hi, lo := bits.Mul64(id, ls.base)
+		if hi != 0 {
+			return 0, fmt.Errorf("%w: %q", ErrKeyOutOfRange, key)
+		}
+		sum, carry := bits.Add64(lo, uint64(idx), 0)
+		if carry != 0 {
+			return 0, fmt.Errorf("%w: %q", ErrKeyOutOfRange, key)
+		}
+		id = sum
 	}
 
 	return id, nil
+}
+
+// Valid reports whether key is a well-formed, canonical key for this
+// Locksmith. It is true exactly when Unmarshal would succeed.
+func (ls *Locksmith) Valid(key string) bool {
+	_, err := ls.Unmarshal(key)
+	return err == nil
 }

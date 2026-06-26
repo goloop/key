@@ -1,25 +1,27 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/key/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://godoc.org/github.com/goloop/key) [![Stay with Ukraine](https://img.shields.io/static/v1?label=Stay%20with&message=Ukraine%20♥&color=ffD700&labelColor=0057B8&style=flat)](https://u24.gov.ua/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/goloop/key)](https://goreportcard.com/report/github.com/goloop/key) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/goloop/key/blob/master/LICENSE) [![License](https://img.shields.io/badge/godoc-YES-green)](https://pkg.go.dev/github.com/goloop/key/v2) [![Stay with Ukraine](https://img.shields.io/static/v1?label=Stay%20with&message=Ukraine%20♥&color=ffD700&labelColor=0057B8&style=flat)](https://u24.gov.ua/)
 
 # Key
 
-Package key allows to find the sequence that will be formed from the permutation of some characters defined in the alphabet by the specified iteration number.
+Package `key` converts `uint64` identifiers into short, reversible string keys
+using a custom alphabet, and decodes them back. It is handy for shortening
+URLs, obfuscating sequential database IDs, and minting human-readable codes
+such as tickets or coupons.
 
-The library can be used to create unique string identifiers based on a numeric identifier, or to create short URLs in redirect systems, or to mask certain indexes in data reports, etc.
+Under the hood a `Locksmith` is a generalized base-N positional codec: with an
+alphabet of N characters the value is written in base N. The mapping is
+deterministic and bidirectional — each ID has exactly one canonical key, and
+each valid key decodes back to its ID. All arithmetic is integer-only
+(`uint64` with `math/bits` overflow checks), so the codec is exact across the
+**whole** `uint64` range, not just for small values.
 
 ## Theory
 
-Use the arbitrary alphabet and size of key can be created a sequence of unique combinations, where each new combination has its unique numeric index (from 0 to N - where the N is maximum number of possible combinations).
+With an arbitrary alphabet and key size you get a sequence of unique
+combinations, where each combination has a unique numeric index (from `0` to
+`Total-1`). Given an index (e.g. a database ID) you get its key; given a key
+you recover the index.
 
-If specify the iteration index (for example, it can be ID field from the some table of database) - will be returned the combination (key) for this index. And if the key is specified - decoding allows to determine the iteration index.
-
-For example, the length of the key is 3 characters and there are several elements to iterate (alphabet): `a`, `b` and `c`. The package allows to answer the following questions:
-
-  - How many maximum possible combinations of permutation of
-    characters from the alphabet for a given key size?
-  - What is the combination of permutation for N iteration?
-  - What is the iteration index for some combination, for example "abc"?
-
-For "abc" alphabet and 3 key size can be created the next iterations:
+For the `"abc"` alphabet and a fixed key size of 3:
 
 ```
     0. aaa    1. aab    2. aac    3. aba    4. abb    5. abc
@@ -29,103 +31,109 @@ For "abc" alphabet and 3 key size can be created the next iterations:
    24. cca   25. ccb   26. ccc
 ```
 
-So, the maximum number of iterations is 27. For the 10 iteration will correspond to the "bab" sequence and for example the "aba" combination is the 3 iteration.
+So the maximum number of iterations is 27. Iteration 10 maps to `"bab"`, and
+the `"aba"` combination is iteration 3.
 
 ## Install
 
-Install key:
-
 ```shell
-$ go get github.com/goloop/key
+$ go get github.com/goloop/key/v2
 ```
 
-Examples:
+## Usage
 
 ```go
 package main
 
 import (
 	"fmt"
-	"github.com/goloop/key"
+
+	key "github.com/goloop/key/v2"
 )
 
 func main() {
-    ls, _ := key.New("abcde", 3)
-    v, _ := ls.Marshal(122)     // eec
-    i, _ := ls.Unmarshal("eec") // 122
+	ls, _ := key.NewFixed("abcde", 3)
+	v, _ := ls.Marshal(122)     // "eec"
+	i, _ := ls.Unmarshal("eec") // 122
 
-    fmt.Println(v, i)
-    // Output: eec 122
+	fmt.Println(v, i)
+	// Output: eec 122
 }
 ```
 
-If you specify the key size as 0 - the key length will be from one character
-to unknown length (depends on the size of the alphabet).
+### Fixed vs dynamic length
 
-Example:
+A **fixed** `Locksmith` always produces keys of a given length, left-padded
+with the first alphabet character:
 
 ```go
-ls, _ = key.New("abc") // size not specified
-ls.Marshal(1)        // "b", <nil>
-ls.Marshal(10)       // "bab", <nil>
-ls.Marshal(100)      // "bacab", <nil>
-ls.Marshal(1000)     // "bbabaab", <nil>
-ls.Marshal(10000)    // "bbbcabbab", <nil>
-ls.Marshal(100000)   // "bcaacabbcab", <nil>
-ls.Marshal(1000000)  // "bcbccbacacaab", <nil>
-ls.Marshal(10000000) // "caacbbaabbacbab", <nil>
-
-ls.Unmarshal("b")               // 1, <nil>
-ls.Unmarshal("bab")             // 10, <nil>
-ls.Unmarshal("bacab")           // 100, <nil>
-ls.Unmarshal("bbabaab")         // 1000, <nil>
-ls.Unmarshal("bbbcabbab")       // 10000, <nil>
-ls.Unmarshal("bcaacabbcab")     // 100000, <nil>
-ls.Unmarshal("bcbccbacacaab")   // 1000000, <nil>
-ls.Unmarshal("caacbbaabbacbab") // 10000000, <nil>
+ls, _ := key.NewFixed("abc", 8)
+ls.Marshal(10) // "aaaaabab"
 ```
 
-## Functions
+A **dynamic** `Locksmith` produces keys as short as the value allows:
 
-- **New**(alphabet string, size ...uint) (*Locksmith, error)
+```go
+ls, _ := key.NewDynamic("abc")
+ls.Marshal(1)        // "b"
+ls.Marshal(10)       // "bab"
+ls.Marshal(10000000) // "caacbbaabbacbab"
+```
 
-  New returns a pointer to a Locksmith object as the first value and an error if something went wrong, or nil as the second value.
+### Strict decoding
 
-  As the first argument, the function takes the size of the key. If the size of the key is set to zero, the key size will be dynamic, i.e. the minimum key size will be one character, and the maximum will depend on the length of the alphabet and the possible maximum iteration index.
+`Unmarshal` enforces a bijection, so a key always round-trips to itself. It
+returns a typed sentinel error you can match with `errors.Is`:
 
-  The second value is the sequence elements for permutation (alphabet). The alphabet mustn't contain duplicate chars or be empty.
+```go
+ls, _ := key.NewDynamic("abc")
 
+_, err := ls.Unmarshal("")     // key.ErrEmptyKey
+_, err = ls.Unmarshal("aab")   // key.ErrNonCanonical (canonical key for 1 is "b")
+_, err = ls.Unmarshal("abX")   // key.ErrUnknownChar
+_ = err
 
-## Locksmith Methods
+ok := ls.Valid("bab") // true; Valid is true iff Unmarshal succeeds
+```
 
-The Locksmith struct represents a key generation object. It provides methods for working with keys, including generating keys from IDs and retrieving IDs from keys.
+### Ready-made alphabets
 
-### Alphabet
+The package ships common alphabets — `Base16`, `Base32`, `Base36`, `Base62`,
+`Crockford` and `Unambiguous` (drops look-alike characters for hand-typed
+codes). Any string of unique characters works too.
 
-- **Alphabet**() string
+```go
+coupon := key.MustNewFixed(key.Unambiguous, 6)
+```
 
-  The `Alphabet` method returns the current alphabet value used by the Locksmith object. The alphabet is a string of unique characters from which the keys will be generated.
+## API
 
-- **Size**() uint64
+### Constructors
 
-  The Size method returns the size of the key set for the Locksmith object. If the size is set to zero, the key size will be dynamic, meaning it can vary depending on the ID.
+- **NewDynamic**(alphabet string) (\*Locksmith, error) — variable-length keys.
+- **NewFixed**(alphabet string, size int) (\*Locksmith, error) — fixed-length keys.
+- **MustNewDynamic** / **MustNewFixed** — like the above but panic on a bad
+  alphabet; meant for package-level codecs with constant parameters.
 
-- **Total**() uint64
+The alphabet must contain at least two unique characters and no duplicates. On
+error the returned `*Locksmith` is `nil`.
 
-  The Total method returns the highest possible iteration number for the Locksmith object. It represents the total number of possible keys that can be generated.
+### Methods
 
-- **Marshal**(id uint64) (string, error)
+- **Alphabet**() string — the alphabet the Locksmith was built with.
+- **Size**() uint64 — the fixed key length, or `0` for a dynamic Locksmith.
+- **Total**() uint64 — number of representable IDs; valid IDs run `0..Total-1`.
+  Saturated to `MaxUint64` for spaces of at least 2⁶⁴.
+- **Saturated**() bool — whether every `uint64` ID fits the key space.
+- **Marshal**(id uint64) (string, error) — encode an ID into its key.
+- **MarshalAppend**(dst []byte, id uint64) ([]byte, error) — encode and append
+  the key to `dst`, avoiding a string allocation on hot paths.
+- **Unmarshal**(key string) (uint64, error) — decode a key back into its ID
+  (strict).
+- **Valid**(key string) bool — whether `key` is a well-formed, canonical key.
 
-  The Marshal method converts an ID into a key. It takes an ID as input and generates a corresponding key based on the Locksmith's alphabet and size.
+### Errors
 
-  The id is the ID to be converted into a key.
-
-  The method returns a string representing the generated key and an error if something went wrong. If the function is successful, the error will be nil.
-
-- **Unmarshal**(key string) (uint64, error)
-
-  The Unmarshal method decodes a key and returns its corresponding ID. It converts a key back into its ID. The key should be a string composed of characters from the Locksmith's alphabet.
-
-  The key is the key to be decoded into an ID.
-
-  The method returns an integer representing the decoded ID and an error if something went wrong. If the function is successful, the error will be nil.
+`ErrBlankAlphabet`, `ErrShortAlphabet`, `ErrDuplicateChar`, `ErrInvalidSize`,
+`ErrIDTooLarge`, `ErrEmptyKey`, `ErrInvalidLength`, `ErrUnknownChar`,
+`ErrNonCanonical`, `ErrKeyOutOfRange` — all matchable with `errors.Is`.

@@ -1,49 +1,40 @@
 package key
 
-// The reverse returns a slice of rune in reverse order.
-func reverse(v []rune) []rune {
-	for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
-		v[i], v[j] = v[j], v[i]
-	}
+import "math/bits"
 
-	return v
-}
-
-// The unlead removes the leading characters from the slice of rune.
+// powU64 computes base**exp using binary exponentiation, entirely in uint64.
 //
-// The leading character is the first character in the alphabet,
-// for example alphabet contains {'a', 'b', 'c', ..., 'z'} i.e.
-// first char is 'a' - it is lead char.
+// Unlike a plain integer pow, every multiplication is checked for overflow
+// with bits.Mul64: if the true result does not fit into uint64 the function
+// returns (0, true). This lets the caller treat an over-large key space as
+// "saturated" instead of silently wrapping around to a wrong (or zero) value.
 //
-// So, if the rune slice is {'a', 'a', 'a', 'c', 'a', 'b'} -
-// function removes the first duplicates and returns a slice
-// without lead chars {'c', 'a', 'b'}.
-func unlead(lead rune, v []rune) []rune {
-	var seek int
-
-	for seek < len(v)-1 && v[seek] == lead {
-		seek++
-	}
-
-	return v[seek:]
-}
-
-// Pow calculates the exponentiation of a base to an exponent using
-// binary exponentiation. It returns the result of base raised to
-// the power of exponent.
-func pow(base, exponent int) int {
-	if exponent < 0 {
-		return 0
-	}
-
-	result := 1
-	for exponent > 0 {
-		if exponent&1 == 1 {
-			result *= base
+// Examples:
+//
+//	powU64(3, 3)   -> (27, false)
+//	powU64(16, 16) -> (0, true)   // 16**16 == 2**64 does not fit uint64
+func powU64(base, exp uint64) (uint64, bool) {
+	result := uint64(1)
+	for exp > 0 {
+		if exp&1 == 1 {
+			hi, lo := bits.Mul64(result, base)
+			if hi != 0 {
+				return 0, true
+			}
+			result = lo
 		}
-		base *= base
-		exponent >>= 1
+
+		exp >>= 1
+		if exp == 0 {
+			break // avoid a final, unused (and possibly overflowing) square
+		}
+
+		hi, lo := bits.Mul64(base, base)
+		if hi != 0 {
+			return 0, true
+		}
+		base = lo
 	}
 
-	return result
+	return result, false
 }

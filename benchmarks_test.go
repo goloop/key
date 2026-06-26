@@ -1,80 +1,93 @@
 package key
 
-import (
-	"testing"
-)
+import "testing"
 
 func BenchmarkNew(b *testing.B) {
-	benchCases := []struct {
+	cases := []struct {
 		name     string
 		alphabet string
 		size     int
 	}{
-		{"SmallAlphabet", "abc", 3},
-		{"MediumAlphabet", "abcdefghijk", 5},
-		{"LargeAlphabet", "abcdefghijklmnopqrstuvwxyz0123456789", 8},
-		{"DynamicSize", "abcdefghijk", 0},
+		{"Fixed_Small", "abc", 3},
+		{"Fixed_Medium", "abcdefghijk", 5},
+		{"Fixed_Large", base36, 8},
+		{"Dynamic", "abcdefghijk", 0},
 	}
 
-	for _, bc := range benchCases {
-		b.Run(bc.name, func(b *testing.B) {
+	for _, c := range cases {
+		b.Run(c.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _ = New(bc.alphabet, bc.size)
+				if c.size == 0 {
+					_, _ = NewDynamic(c.alphabet)
+				} else {
+					_, _ = NewFixed(c.alphabet, c.size)
+				}
 			}
 		})
 	}
 }
 
 func BenchmarkMarshal(b *testing.B) {
-	benchCases := []struct {
+	cases := []struct {
 		name     string
 		alphabet string
 		size     int
 		id       uint64
 	}{
-		{"Small_ID_FixedSize", "abc", 3, 10},
-		{"Medium_ID_FixedSize", "abcdefghijk", 5, 1000},
-		{"Large_ID_FixedSize", "abcdefghijklmnopqrstuvwxyz0123456789", 8, 1000000},
-		{"Small_ID_DynamicSize", "abc", 0, 10},
-		{"Large_ID_DynamicSize", "abcdefghijklmnopqrstuvwxyz0123456789", 0, 1000000},
+		{"Small_ID_Fixed", "abc", 3, 10},
+		{"Medium_ID_Fixed", "abcdefghijk", 5, 1000},
+		{"Large_ID_Fixed", base36, 8, 1000000},
+		{"Small_ID_Dynamic", "abc", 0, 10},
+		{"Large_ID_Dynamic", base36, 0, 1000000},
 	}
 
-	for _, bc := range benchCases {
-		ls, _ := New(bc.alphabet, bc.size)
-		b.Run(bc.name, func(b *testing.B) {
+	for _, c := range cases {
+		ls := build(c.alphabet, c.size)
+		b.Run(c.name, func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, _ = ls.Marshal(bc.id)
+				_, _ = ls.Marshal(c.id)
 			}
 		})
 	}
 }
 
+func BenchmarkMarshalAppend(b *testing.B) {
+	ls := build(base36, 8)
+	buf := make([]byte, 0, 16)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		buf, _ = ls.MarshalAppend(buf[:0], 1000000)
+	}
+}
+
 func BenchmarkUnmarshal(b *testing.B) {
-	benchCases := []struct {
+	cases := []struct {
 		name     string
 		alphabet string
 		size     int
 		key      string
 	}{
-		{"Short_Key_FixedSize", "abc", 3, "bab"},
-		{"Medium_Key_FixedSize", "abcdefghijk", 5, "defgh"},
-		{"Long_Key_FixedSize", "abcdefghijklmnopqrstuvwxyz0123456789", 8, "12345678"},
-		{"Short_Key_DynamicSize", "abc", 0, "bab"},
-		{"Long_Key_DynamicSize", "abcdefghijklmnopqrstuvwxyz0123456789", 0, "12345678"},
+		{"Short_Fixed", "abc", 3, "bab"},
+		{"Medium_Fixed", "abcdefghijk", 5, "defgh"},
+		{"Long_Fixed", base36, 8, "12345678"},
+		{"Short_Dynamic", "abc", 0, "bab"},
+		{"Long_Dynamic", base36, 0, "12345678"},
 	}
 
-	for _, bc := range benchCases {
-		ls, _ := New(bc.alphabet, bc.size)
-		b.Run(bc.name, func(b *testing.B) {
+	for _, c := range cases {
+		ls := build(c.alphabet, c.size)
+		b.Run(c.name, func(b *testing.B) {
+			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, _ = ls.Unmarshal(bc.key)
+				_, _ = ls.Unmarshal(c.key)
 			}
 		})
 	}
 }
 
 func BenchmarkParallelOperations(b *testing.B) {
-	ls, _ := New("abcdefghijklmnopqrstuvwxyz0123456789", 8)
+	ls := build(base36, 8)
 
 	b.Run("Parallel_Marshal", func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
@@ -87,11 +100,19 @@ func BenchmarkParallelOperations(b *testing.B) {
 	})
 
 	b.Run("Parallel_Unmarshal", func(b *testing.B) {
-		key, _ := ls.Marshal(123456)
+		k, _ := ls.Marshal(123456)
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				_, _ = ls.Unmarshal(key)
+				_, _ = ls.Unmarshal(k)
 			}
 		})
 	})
+}
+
+// build is a test helper: size 0 selects a dynamic codec, otherwise fixed.
+func build(alphabet string, size int) *Locksmith {
+	if size == 0 {
+		return MustNewDynamic(alphabet)
+	}
+	return MustNewFixed(alphabet, size)
 }

@@ -1,53 +1,51 @@
-// Package key provides tools for generating and decoding unique, reversible
-// string identifiers from numeric values using a custom alphabet. This package
-// is particularly useful for creating URL-friendly identifiers, obfuscating
-// sequential IDs, and generating human-readable unique keys.
+// Package key converts uint64 identifiers into short, reversible string keys
+// using a custom alphabet, and decodes them back. It is handy for shortening
+// URLs, obfuscating sequential database ids, and minting human-readable codes
+// such as tickets or coupons.
 //
-// The package is built around the Locksmith type, which handles the conversion
-// between numeric values and string keys. The conversion is bidirectional and
-// deterministic - each numeric value maps to a unique string key, and each
-// valid key maps back to its original numeric value.
+// Under the hood a Locksmith is a generalized base-N positional codec: with an
+// alphabet of N characters the value is written in base N. The mapping is
+// deterministic and bidirectional - each id has exactly one canonical key, and
+// each valid key decodes back to its id. All arithmetic is integer-only
+// (uint64 with math/bits overflow checks), so the codec is exact across the
+// whole uint64 range, not just for small values.
 //
-// Common Use Cases:
+// # Two modes
 //
-//   - URL Shortening: Generate short, readable URLs from sequential IDs
-//     Example:
-//     ls, _ := key.New("abcdefghijklmnopqrstuvwxyz", 5)
-//     shortURL, _ := ls.Marshal(1234567)
+// A dynamic Locksmith yields variable-length keys, as short as the value
+// allows:
 //
-//   - ID Obfuscation: Hide sequential database IDs in public-facing identifiers
-//     Example:
-//     ls, _ := key.New("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 8)
-//     publicID, _ := ls.Marshal(userID) // convert DB ID to public identifier
-//     dbID, _ := ls.Unmarshal(publicID) // recover original DB ID when needed
+//	ls, _ := key.NewDynamic(key.Base62)
+//	k, _ := ls.Marshal(1234567) // "5BAH"
+//	id, _ := ls.Unmarshal(k)    // 1234567
 //
-//   - Ticket/Coupon Generation: Create unique, readable codes
-//     Example:
-//     ls, _ := key.New("23456789ABCDEFGHJKLMNPQRSTUVWXYZ", 6)
-//     ticketCode, _ := ls.Marshal(ticketID)
+// A fixed Locksmith always yields keys of a given length, left-padded with the
+// first alphabet character:
 //
-//   - Resource Identifiers: Generate unique identifiers for resources
-//     Example:
-//     ls, _ := key.New("0123456789abcdef", 0) // dynamic length
-//     resourceID, _ := ls.Marshal(timestamp)
+//	ls, _ := key.NewFixed(key.Base62, 8)
+//	k, _ := ls.Marshal(1234567) // "00005BAH"
 //
-// Key Features:
+// # Strict decoding
 //
-//   - Customizable alphabet for generated keys
-//   - Support for both fixed and dynamic length keys
-//   - Bidirectional conversion (numeric <-> string)
-//   - No collision guarantee within the defined space
-//   - Thread-safe operations
-//   - No external dependencies
+// Unmarshal enforces a bijection. It rejects the empty string, keys of the
+// wrong length (fixed mode), non-canonical keys with redundant leading
+// lead-characters (dynamic mode), unknown characters, and values that overflow
+// uint64. Use the sentinel errors with errors.Is to react to each case, or
+// Valid to test a key without decoding it.
 //
-// The package ensures that generated keys are unique within the possible
-// range determined by the alphabet length and key size. For fixed-size keys,
-// the maximum possible value is alphabet_length^key_size. For dynamic-size
-// keys, the maximum value is uint64.MaxValue.
+// # Key space
 //
-// For optimal performance and security, consider:
-//   - Choose an alphabet size appropriate for your use case.
-//   - Avoid similar-looking characters if keys will be manually typed.
-//   - Use fixed-size keys when possible for consistent length.
-//   - Consider the trade-off between key length and alphabet size.
+// For a fixed Locksmith the space is alphabet_length**size; for a dynamic one
+// it spans the whole uint64 range. When the space reaches or exceeds 2**64 it
+// is reported as saturated: Total returns MaxUint64, Saturated returns true,
+// and every uint64 id is encodable.
+//
+// # Common alphabets
+//
+// The package ships ready-made alphabets (Base16, Base32, Base36, Base62,
+// Crockford, Unambiguous); any string of unique characters works too. Prefer
+// an unambiguous alphabet when keys are typed by hand, and a fixed size when a
+// constant length matters.
+//
+// A Locksmith is immutable after construction and safe for concurrent use.
 package key
