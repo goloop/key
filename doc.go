@@ -47,5 +47,14 @@
 // an unambiguous alphabet when keys are typed by hand, and a fixed size when a
 // constant length matters.
 //
+// # Iteration and random keys
+//
+// Iter walks an inclusive id range as a range-over-func sequence, and Random
+// draws a uniformly distributed id (rejection sampling, no modulo bias) from a
+// supplied io.Reader - pass crypto/rand.Reader for secure keys:
+//
+//	for id, k := range ls.Iter(0, 99) { ... }
+//	k, _ := ls.Random(rand.Reader)
+//
 // A Locksmith is immutable after construction and safe for concurrent use.
 package key

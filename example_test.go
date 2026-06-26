@@ -52,6 +52,16 @@ func ExampleLocksmith_Valid() {
 	// false
 }
 
+func ExampleLocksmith_Iter() {
+	ls, _ := key.NewFixed("abc", 2)
+
+	for id, k := range ls.Iter(3, 6) {
+		fmt.Printf("%d:%s ", id, k)
+	}
+	fmt.Println()
+	// Output: 3:ba 4:bb 5:bc 6:ca
+}
+
 func ExampleLocksmith_MarshalAppend() {
 	ls := key.MustNewFixed(key.Base62, 6)
 

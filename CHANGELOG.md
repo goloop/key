@@ -25,6 +25,10 @@ range and decoding is a strict bijection. The module path is now
 
 ### Added
 - `MarshalAppend(dst, id)`, `Valid(key)`, `Saturated()`.
+- `Iter(from, to) iter.Seq2[uint64, string]` — range-over-func over an
+  inclusive ID range.
+- `Random(r io.Reader)` — a key for a uniformly random ID via rejection
+  sampling (pair with `crypto/rand`).
 - `MustNewDynamic` / `MustNewFixed`.
 - Ready-made alphabets: `Base16`, `Base32`, `Base36`, `Base62`, `Crockford`,
   `Unambiguous`.

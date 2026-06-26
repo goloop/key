@@ -131,6 +131,10 @@ error the returned `*Locksmith` is `nil`.
 - **Unmarshal**(key string) (uint64, error) — decode a key back into its ID
   (strict).
 - **Valid**(key string) bool — whether `key` is a well-formed, canonical key.
+- **Iter**(from, to uint64) iter.Seq2[uint64, string] — range-over-func over the
+  inclusive ID range `[from, to]`, yielding `(id, key)` pairs.
+- **Random**(r io.Reader) (string, error) — a key for a uniformly random ID
+  (rejection sampling, no modulo bias). Pass `crypto/rand.Reader` for secure keys.
 
 ### Errors
 

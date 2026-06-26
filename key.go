@@ -2,6 +2,7 @@ package key
 
 import (
 	"fmt"
+	"iter"
 	"math"
 	"math/bits"
 	"unicode/utf8"
@@ -278,4 +279,33 @@ func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
 func (ls *Locksmith) Valid(key string) bool {
 	_, err := ls.Unmarshal(key)
 	return err == nil
+}
+
+// Iter returns a range-over-func sequence of (id, key) pairs for ids in the
+// inclusive range [from, to]. For a bounded Locksmith to is clamped to the
+// last valid id (Total-1); if from is past the end the sequence is empty.
+//
+//	for id, k := range ls.Iter(0, 99) {
+//	    fmt.Println(id, k)
+//	}
+//
+// The inclusive upper bound lets the sequence reach the final id (including
+// MaxUint64 on a saturated space), which a half-open range could not express.
+func (ls *Locksmith) Iter(from, to uint64) iter.Seq2[uint64, string] {
+	return func(yield func(uint64, string) bool) {
+		hi := to
+		if !ls.full && hi > ls.total-1 {
+			hi = ls.total - 1
+		}
+		if from > hi {
+			return
+		}
+
+		for id := from; ; id++ {
+			k, _ := ls.Marshal(id) // cannot fail: id is within the space
+			if !yield(id, k) || id == hi {
+				return
+			}
+		}
+	}
 }
