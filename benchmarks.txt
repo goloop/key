@@ -4,22 +4,23 @@
 goos: linux
 goarch: arm64
 pkg: github.com/goloop/key/v2
-BenchmarkNew/Fixed_Small-8      	 7086122	       165.4 ns/op	     272 B/op	       4 allocs/op
-BenchmarkNew/Fixed_Medium-8     	 3420380	       351.3 ns/op	     488 B/op	       6 allocs/op
-BenchmarkNew/Fixed_Large-8      	 1463649	       836.3 ns/op	    1448 B/op	       6 allocs/op
-BenchmarkNew/Dynamic-8          	 3541249	       350.7 ns/op	     488 B/op	       6 allocs/op
-BenchmarkMarshal/Small_ID_Fixed-8         	35536996	        33.04 ns/op	       8 B/op	       1 allocs/op
-BenchmarkMarshal/Medium_ID_Fixed-8        	28424511	        41.15 ns/op	       8 B/op	       1 allocs/op
-BenchmarkMarshal/Large_ID_Fixed-8         	20177307	        56.69 ns/op	      16 B/op	       1 allocs/op
-BenchmarkMarshal/Small_ID_Dynamic-8       	36244149	        32.93 ns/op	       8 B/op	       1 allocs/op
-BenchmarkMarshal/Large_ID_Dynamic-8       	30160857	        38.75 ns/op	       8 B/op	       1 allocs/op
-BenchmarkMarshalAppend-8                  	63141829	        19.62 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUnmarshal/Short_Fixed-8          	59522456	        19.90 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUnmarshal/Medium_Fixed-8         	31958275	        37.03 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUnmarshal/Long_Fixed-8           	21005660	        57.76 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUnmarshal/Short_Dynamic-8        	59241951	        19.98 ns/op	       0 B/op	       0 allocs/op
-BenchmarkUnmarshal/Long_Dynamic-8         	20828089	        57.81 ns/op	       0 B/op	       0 allocs/op
-BenchmarkParallelOperations/Parallel_Marshal-8         	77570948	        15.23 ns/op	      16 B/op	       1 allocs/op
-BenchmarkParallelOperations/Parallel_Unmarshal-8       	100000000	        14.56 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNew/Fixed_Small-8      	 4782723	       211.8 ns/op	     272 B/op	       4 allocs/op
+BenchmarkNew/Fixed_Medium-8     	 2753722	       574.2 ns/op	     488 B/op	       6 allocs/op
+BenchmarkNew/Fixed_Large-8      	 1000000	      1128 ns/op	    1448 B/op	       6 allocs/op
+BenchmarkNew/Dynamic-8          	 3013681	       556.6 ns/op	     488 B/op	       6 allocs/op
+BenchmarkMarshal/Small_ID_Fixed-8         	31781062	        42.09 ns/op	       8 B/op	       1 allocs/op
+BenchmarkMarshal/Medium_ID_Fixed-8        	20795739	        51.33 ns/op	       8 B/op	       1 allocs/op
+BenchmarkMarshal/Large_ID_Fixed-8         	14402642	        96.22 ns/op	      16 B/op	       1 allocs/op
+BenchmarkMarshal/Small_ID_Dynamic-8       	33256389	        62.60 ns/op	       8 B/op	       1 allocs/op
+BenchmarkMarshal/Large_ID_Dynamic-8       	16835793	        74.20 ns/op	       8 B/op	       1 allocs/op
+BenchmarkMarshalAppend-8                  	43797085	        25.26 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Short_Fixed-8          	73796709	        16.35 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Medium_Fixed-8         	36567340	        33.48 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Long_Fixed-8           	23144631	        51.54 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Short_Dynamic-8        	91669825	        13.33 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Long_Dynamic-8         	23918139	        54.72 ns/op	       0 B/op	       0 allocs/op
+BenchmarkUnmarshal/Max64_Dynamic-8        	 3686869	       313.9 ns/op	       0 B/op	       0 allocs/op
+BenchmarkParallelOperations/Parallel_Marshal-8         	39241125	        27.79 ns/op	      16 B/op	       1 allocs/op
+BenchmarkParallelOperations/Parallel_Unmarshal-8       	80263305	        12.84 ns/op	       0 B/op	       0 allocs/op
 PASS
-ok  	github.com/goloop/key/v2	22.718s
+ok  	github.com/goloop/key/v2	26.797s

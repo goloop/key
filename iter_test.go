@@ -93,6 +93,83 @@ func TestIterEarlyStop(t *testing.T) {
 	}
 }
 
+// TestIterNCount checks IterN yields exactly n consecutive ids from `from`.
+func TestIterNCount(t *testing.T) {
+	ls, _ := NewDynamic("abc")
+	var ids []uint64
+	for id, k := range ls.IterN(10, 5) {
+		if want, _ := ls.Marshal(id); k != want {
+			t.Fatalf("IterN id %d key = %q, want %q", id, k, want)
+		}
+		ids = append(ids, id)
+	}
+	want := []uint64{10, 11, 12, 13, 14}
+	if len(ids) != len(want) {
+		t.Fatalf("got %v, want %v", ids, want)
+	}
+	for i := range want {
+		if ids[i] != want[i] {
+			t.Fatalf("got %v, want %v", ids, want)
+		}
+	}
+}
+
+// TestIterNClampsAtSpaceEnd verifies IterN stops at the end of a bounded space
+// even when n asks for more.
+func TestIterNClampsAtSpaceEnd(t *testing.T) {
+	ls, _ := NewFixed("abc", 3) // Total 27, last id 26
+	var n int
+	var last uint64
+	for id := range ls.IterN(24, 100) {
+		last = id
+		n++
+	}
+	if n != 3 || last != 26 { // 24, 25, 26
+		t.Fatalf("count %d last %d, want 3 and 26", n, last)
+	}
+}
+
+// TestIterNFromBeyondTotal and n==0 both produce empty sequences.
+func TestIterNEmpty(t *testing.T) {
+	ls, _ := NewFixed("abc", 3)
+	for range ls.IterN(100, 10) {
+		t.Fatal("expected empty for from past Total")
+	}
+	dyn, _ := NewDynamic("abc")
+	for range dyn.IterN(0, 0) {
+		t.Fatal("expected empty for n == 0")
+	}
+}
+
+// TestIterNEarlyStop honours break.
+func TestIterNEarlyStop(t *testing.T) {
+	ls, _ := NewDynamic("abc")
+	var n int
+	for range ls.IterN(0, 1000) {
+		n++
+		if n == 4 {
+			break
+		}
+	}
+	if n != 4 {
+		t.Fatalf("count = %d, want 4", n)
+	}
+}
+
+// TestIterNNoOverflowAtTop confirms IterN stops at MaxUint64 without wrapping
+// the id counter, even when n would allow more.
+func TestIterNNoOverflowAtTop(t *testing.T) {
+	ls, _ := NewDynamic("ab") // saturated, max id MaxUint64
+	var ids []uint64
+	for id := range ls.IterN(math.MaxUint64-1, 10) {
+		ids = append(ids, id)
+	}
+	want := []uint64{math.MaxUint64 - 1, math.MaxUint64}
+	if len(ids) != 2 || ids[0] != want[0] || ids[1] != want[1] {
+		t.Fatalf("got %v, want %v (must not wrap past MaxUint64)", ids, want)
+	}
+}
+
 // TestIterReachesMaxUint64 confirms the inclusive bound can yield the very last
 // id on a saturated space, which a half-open range could never reach.
 func TestIterReachesMaxUint64(t *testing.T) {

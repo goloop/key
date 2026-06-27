@@ -1,6 +1,7 @@
 package key
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"io"
 	"math"
@@ -9,6 +10,10 @@ import (
 // Random returns a key for a uniformly random id drawn from the key space,
 // reading its randomness from r. Pass crypto/rand.Reader for cryptographically
 // secure keys, or any deterministic io.Reader in tests.
+//
+// The security of the result is exactly the security of r: a predictable reader
+// yields predictable keys. For secure keys use RandomCrypto, or pass
+// crypto/rand.Reader here.
 //
 // The id is sampled without modulo bias: for a bounded space the function uses
 // rejection sampling so every id in [0, Total) is equally likely; for a
@@ -29,6 +34,13 @@ func (ls *Locksmith) Random(r io.Reader) (string, error) {
 	}
 
 	return ls.Marshal(id)
+}
+
+// RandomCrypto returns a key for a uniformly random id drawn from
+// crypto/rand.Reader. It is the secure-by-default convenience wrapper over
+// Random; use Random directly only to supply your own source of randomness.
+func (ls *Locksmith) RandomCrypto() (string, error) {
+	return ls.Random(rand.Reader)
 }
 
 // readUint64 reads eight bytes from r and assembles them into a uint64.

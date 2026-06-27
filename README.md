@@ -133,8 +133,12 @@ error the returned `*Locksmith` is `nil`.
 - **Valid**(key string) bool — whether `key` is a well-formed, canonical key.
 - **Iter**(from, to uint64) iter.Seq2[uint64, string] — range-over-func over the
   inclusive ID range `[from, to]`, yielding `(id, key)` pairs.
+- **IterN**(from, n uint64) iter.Seq2[uint64, string] — at most `n` keys from
+  `from`; count-bounded, safer than `Iter` for bulk generation.
 - **Random**(r io.Reader) (string, error) — a key for a uniformly random ID
   (rejection sampling, no modulo bias). Pass `crypto/rand.Reader` for secure keys.
+- **RandomCrypto**() (string, error) — secure-by-default wrapper over
+  `Random(crypto/rand.Reader)`.
 
 ### Errors
 

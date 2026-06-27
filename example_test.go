@@ -1,6 +1,7 @@
 package key_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -60,6 +61,17 @@ func ExampleLocksmith_Iter() {
 	}
 	fmt.Println()
 	// Output: 3:ba 4:bb 5:bc 6:ca
+}
+
+func ExampleLocksmith_Random() {
+	ls, _ := key.NewFixed("0123456789", 1) // Total 10
+
+	// A fixed reader keeps the output deterministic for the example. In
+	// production pass crypto/rand.Reader, or call RandomCrypto.
+	r := bytes.NewReader([]byte{0, 0, 0, 0, 0, 0, 0, 42}) // 42 -> 42 % 10
+	k, _ := ls.Random(r)
+	fmt.Println(k)
+	// Output: 2
 }
 
 func ExampleLocksmith_MarshalAppend() {

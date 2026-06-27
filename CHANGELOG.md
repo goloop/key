@@ -26,9 +26,9 @@ range and decoding is a strict bijection. The module path is now
 ### Added
 - `MarshalAppend(dst, id)`, `Valid(key)`, `Saturated()`.
 - `Iter(from, to) iter.Seq2[uint64, string]` — range-over-func over an
-  inclusive ID range.
+  inclusive ID range, and `IterN(from, n)` — a count-bounded variant.
 - `Random(r io.Reader)` — a key for a uniformly random ID via rejection
-  sampling (pair with `crypto/rand`).
+  sampling — and `RandomCrypto()`, its secure-by-default `crypto/rand` wrapper.
 - `MustNewDynamic` / `MustNewFixed`.
 - Ready-made alphabets: `Base16`, `Base32`, `Base36`, `Base62`, `Crockford`,
   `Unambiguous`.
@@ -50,5 +50,6 @@ range and decoding is a strict bijection. The module path is now
 ### Performance
 - `Marshal` rebuilt to a single allocation and linear time (no per-character
   string concatenation).
-- `Unmarshal` uses Horner's scheme (no per-character `pow`), staying allocation
-  free.
+- `Unmarshal` uses Horner's scheme (no per-character `pow`) and iterates the
+  key as a string, so it is allocation-free even for long keys (no `[]rune`
+  materialization).

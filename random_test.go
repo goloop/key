@@ -129,6 +129,29 @@ func TestRandomDistribution(t *testing.T) {
 	}
 }
 
+// TestRandomCrypto exercises the secure wrapper end-to-end: every draw is a
+// valid, in-range key, and the source produces good variety.
+func TestRandomCrypto(t *testing.T) {
+	ls, _ := NewFixed("abcd", 4) // Total 256
+	seen := make(map[string]bool)
+	for i := 0; i < 1000; i++ {
+		k, err := ls.RandomCrypto()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ls.Valid(k) {
+			t.Fatalf("RandomCrypto produced invalid key %q", k)
+		}
+		if id, _ := ls.Unmarshal(k); id >= ls.Total() {
+			t.Fatalf("id %d out of range (Total %d)", id, ls.Total())
+		}
+		seen[k] = true
+	}
+	if len(seen) < 50 {
+		t.Fatalf("only %d distinct keys from 1000 draws; entropy source suspect", len(seen))
+	}
+}
+
 // TestUniformUint64Single covers the n == 1 short-circuit directly.
 func TestUniformUint64Single(t *testing.T) {
 	got, err := uniformUint64(u64Reader(), 1)

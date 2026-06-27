@@ -73,6 +73,9 @@ func BenchmarkUnmarshal(b *testing.B) {
 		{"Long_Fixed", base36, 8, "12345678"},
 		{"Short_Dynamic", "abc", 0, "bab"},
 		{"Long_Dynamic", base36, 0, "12345678"},
+		// 64-char base-2 key (MaxUint64): the worst case for the decoder; it
+		// must stay allocation-free (guards the []rune removal).
+		{"Max64_Dynamic", "ab", 0, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
 	}
 
 	for _, c := range cases {

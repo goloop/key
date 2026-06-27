@@ -235,25 +235,27 @@ func (ls *Locksmith) MarshalAppend(dst []byte, id uint64) ([]byte, error) {
 //   - a character outside the alphabet (ErrUnknownChar);
 //   - a value that overflows uint64 (ErrKeyOutOfRange).
 func (ls *Locksmith) Unmarshal(key string) (uint64, error) {
-	runes := []rune(key)
-	if len(runes) == 0 {
+	if key == "" {
 		return 0, ErrEmptyKey
 	}
 
+	// Walk the key as a string (range yields runes without allocating a
+	// []rune), so even long keys decode allocation-free.
 	if ls.size > 0 {
-		if l := uint64(len(runes)); l != ls.size {
+		if l := uint64(utf8.RuneCountInString(key)); l != ls.size {
 			return 0, fmt.Errorf("%w: want %d char(s), got %d",
 				ErrInvalidLength, ls.size, l)
 		}
-	} else if len(runes) > 1 && runes[0] == ls.alphabet[0] {
-		// Dynamic keys are not padded, so a leading lead-character (other than
-		// the single-character key for zero) is a non-canonical encoding.
+	} else if r0, s0 := utf8.DecodeRuneInString(key); r0 == ls.alphabet[0] && len(key) > s0 {
+		// Dynamic keys are not padded, so a leading lead-character (when more
+		// than one rune follows) is a non-canonical encoding. len(key) > s0
+		// means at least one more rune after the first.
 		return 0, fmt.Errorf("%w: redundant leading %q",
 			ErrNonCanonical, ls.alphabet[0])
 	}
 
 	var id uint64
-	for _, ch := range runes {
+	for _, ch := range key {
 		idx, ok := ls.indexOf[ch]
 		if !ok {
 			return 0, fmt.Errorf("%w: %q", ErrUnknownChar, ch)
@@ -291,6 +293,9 @@ func (ls *Locksmith) Valid(key string) bool {
 //
 // The inclusive upper bound lets the sequence reach the final id (including
 // MaxUint64 on a saturated space), which a half-open range could not express.
+//
+// Beware the cost on a saturated space: ranging Iter(0, math.MaxUint64) without
+// break enumerates 2**64 keys. Prefer IterN when you want a known count.
 func (ls *Locksmith) Iter(from, to uint64) iter.Seq2[uint64, string] {
 	return func(yield func(uint64, string) bool) {
 		hi := to
@@ -306,6 +311,34 @@ func (ls *Locksmith) Iter(from, to uint64) iter.Seq2[uint64, string] {
 			if !yield(id, k) || id == hi {
 				return
 			}
+		}
+	}
+}
+
+// IterN returns a range-over-func sequence of at most n (id, key) pairs
+// starting at id from. It is a count-bounded, safer alternative to Iter for
+// bulk generation: it never yields more than n keys, so it cannot accidentally
+// enumerate a whole saturated space. The sequence is shorter than n only when
+// the key space ends first.
+//
+//	for id, k := range ls.IterN(1000, 50) { // 50 keys starting at id 1000
+//	    fmt.Println(id, k)
+//	}
+func (ls *Locksmith) IterN(from, n uint64) iter.Seq2[uint64, string] {
+	return func(yield func(uint64, string) bool) {
+		id := from
+		for count := uint64(0); count < n; count++ {
+			if !ls.full && id >= ls.total {
+				return // ran past the end of a bounded space
+			}
+			k, _ := ls.Marshal(id) // cannot fail: id is within the space
+			if !yield(id, k) {
+				return
+			}
+			if id == math.MaxUint64 {
+				return // reached the top; avoid wrapping id++
+			}
+			id++
 		}
 	}
 }

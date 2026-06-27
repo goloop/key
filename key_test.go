@@ -495,6 +495,25 @@ func TestConcurrentReads(t *testing.T) {
 	wg.Wait()
 }
 
+// TestUnmarshalLongKeyNoAlloc guards the BUG-01 fix: decoding even a maximal
+// 64-character key must not allocate (no []rune materialization).
+func TestUnmarshalLongKeyNoAlloc(t *testing.T) {
+	ls, _ := NewDynamic("ab") // base 2 -> 64-char key for MaxUint64
+	k, _ := ls.Marshal(math.MaxUint64)
+	if len(k) != 64 {
+		t.Fatalf("setup: key length %d, want 64", len(k))
+	}
+
+	allocs := testing.AllocsPerRun(200, func() {
+		if _, err := ls.Unmarshal(k); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocs != 0 {
+		t.Errorf("Unmarshal allocated %.1f times on a 64-char key, want 0", allocs)
+	}
+}
+
 // --- helpers ---
 
 func mustDyn(alphabet string) *Locksmith   { return MustNewDynamic(alphabet) }
