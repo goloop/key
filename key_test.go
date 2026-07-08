@@ -27,6 +27,9 @@ func TestConstructorValidation(t *testing.T) {
 		{"fixed duplicate", func() (*Locksmith, error) { return NewFixed("abcc", 3) }, ErrDuplicateChar},
 		{"fixed zero size", func() (*Locksmith, error) { return NewFixed("abc", 0) }, ErrInvalidSize},
 		{"fixed negative size", func() (*Locksmith, error) { return NewFixed("abc", -1) }, ErrInvalidSize},
+		{"dynamic invalid utf8", func() (*Locksmith, error) { return NewDynamic("a\xffb") }, ErrInvalidAlphabet},
+		{"dynamic replacement char", func() (*Locksmith, error) { return NewDynamic("a�b") }, ErrInvalidAlphabet},
+		{"fixed invalid utf8", func() (*Locksmith, error) { return NewFixed("a\xffb", 4) }, ErrInvalidAlphabet},
 	}
 
 	for _, tt := range tests {

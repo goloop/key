@@ -16,14 +16,14 @@
 // allows:
 //
 //	ls, _ := key.NewDynamic(key.Base62)
-//	k, _ := ls.Marshal(1234567) // "5BAH"
+//	k, _ := ls.Marshal(1234567) // "5BAN"
 //	id, _ := ls.Unmarshal(k)    // 1234567
 //
 // A fixed Locksmith always yields keys of a given length, left-padded with the
 // first alphabet character:
 //
 //	ls, _ := key.NewFixed(key.Base62, 8)
-//	k, _ := ls.Marshal(1234567) // "00005BAH"
+//	k, _ := ls.Marshal(1234567) // "00005BAN"
 //
 // # Strict decoding
 //

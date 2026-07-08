@@ -35,6 +35,14 @@ type Locksmith struct {
 // dynamic == true selects a variable-length codec; otherwise size is the fixed
 // key width.
 func newLocksmith(alphabet string, size uint64, dynamic bool) (*Locksmith, error) {
+	// Reject malformed UTF-8 up front. Both []rune(alphabet) and ranging a
+	// string map invalid bytes to U+FFFD, which would let a malformed byte in
+	// a key decode to an accepted "digit" and alias several byte strings to one
+	// id, breaking the strict bijection.
+	if !utf8.ValidString(alphabet) {
+		return nil, fmt.Errorf("%w: invalid UTF-8", ErrInvalidAlphabet)
+	}
+
 	runes := []rune(alphabet)
 	switch {
 	case len(runes) == 0:
@@ -47,6 +55,11 @@ func newLocksmith(alphabet string, size uint64, dynamic bool) (*Locksmith, error
 	// would make two digit values share a character, breaking the bijection.
 	indexOf := make(map[rune]int, len(runes))
 	for i, ch := range runes {
+		// U+FFFD is indistinguishable from the decode-replacement result after
+		// a range over a key, so forbid it even in a well-formed alphabet.
+		if ch == utf8.RuneError {
+			return nil, fmt.Errorf("%w: contains U+FFFD", ErrInvalidAlphabet)
+		}
 		if _, dup := indexOf[ch]; dup {
 			return nil, fmt.Errorf("%w: %q", ErrDuplicateChar, ch)
 		}

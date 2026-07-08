@@ -15,6 +15,13 @@ var (
 	// zero and would loop forever, so it is rejected up front.
 	ErrShortAlphabet = errors.New("alphabet must contain at least 2 unique characters")
 
+	// ErrInvalidAlphabet is returned when the alphabet is not valid UTF-8 or
+	// contains the replacement character U+FFFD. Such an alphabet would break
+	// the strict bijection: a malformed byte in a key decodes to U+FFFD and is
+	// silently accepted, even though Marshal only ever emits the canonical
+	// three-byte encoding, so several distinct byte strings would alias one id.
+	ErrInvalidAlphabet = errors.New("alphabet is not valid UTF-8")
+
 	// ErrDuplicateChar is returned when the alphabet contains the same
 	// character more than once.
 	ErrDuplicateChar = errors.New("alphabet contains a duplicate character")

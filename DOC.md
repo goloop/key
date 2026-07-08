@@ -124,7 +124,7 @@ ls, _ := key.NewFixed("abcde", 3)
 v, _ := ls.Marshal(122)     // "eec"
 i, _ := ls.Unmarshal("eec") // 122
 
-buf := ls.Alphabet()[:0]
+buf := make([]byte, 0, 16)
 buf, _ = ls.MarshalAppend(buf[:0], 122) // append into a reusable buffer
 ```
 
@@ -206,8 +206,10 @@ rejection sampling, so there is **no modulo bias**, and returns its key. Pass
 secure-by-default wrapper over `Random(crypto/rand.Reader)`.
 
 ```go
-k, _ := ls.RandomCrypto()          // secure by default
-k, _ = ls.Random(mathrand.Reader)  // fast, non-secure — for tests/sampling
+k, _ := ls.RandomCrypto() // secure by default
+// For tests or sampling, pass any deterministic io.Reader.
+seed := bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+k, _ = ls.Random(seed)
 ```
 
 ## Ready-made alphabets

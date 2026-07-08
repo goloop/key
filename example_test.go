@@ -24,6 +24,21 @@ func ExampleNewFixed() {
 	// Output: abab
 }
 
+// ExampleLocksmith_Marshal pins the Base62 vectors quoted in the package
+// documentation so they stay in sync with the code.
+func ExampleLocksmith_Marshal() {
+	dyn, _ := key.NewDynamic(key.Base62)
+	fix, _ := key.NewFixed(key.Base62, 8)
+
+	d, _ := dyn.Marshal(1234567)
+	f, _ := fix.Marshal(1234567)
+	fmt.Println(d)
+	fmt.Println(f)
+	// Output:
+	// 5BAN
+	// 00005BAN
+}
+
 func ExampleLocksmith_Unmarshal() {
 	ls, _ := key.NewDynamic("abc")
 

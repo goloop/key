@@ -204,8 +204,10 @@ func (l *Locksmith) RandomCrypto() (string, error)
 безпечна за замовчуванням обгортка над `Random(crypto/rand.Reader)`.
 
 ```go
-k, _ := ls.RandomCrypto()          // безпечно за замовчуванням
-k, _ = ls.Random(mathrand.Reader)  // швидко, небезпечно — для тестів/семплування
+k, _ := ls.RandomCrypto() // безпечно за замовчуванням
+// Для тестів чи семплування передайте будь-який детермінований io.Reader.
+seed := bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+k, _ = ls.Random(seed)
 ```
 
 ## Готові алфавіти
